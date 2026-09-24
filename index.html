@@ -121,9 +121,13 @@
     <h2>Son et image</h2>
     <label>Sensibilité micro <input type="range" id="gain" min="0.5" max="8" step="0.1"><output id="gainV"></output></label>
     <div class="meter" aria-label="Niveaux basses, médiums, aigus"><i id="mB"></i><i id="mM"></i><i id="mT"></i></div>
+    <p class="hint" id="meterTxt">Basses — · Médiums — · Aigus —</p>
+    <div class="btns"><button id="calBtn">Calibrer (2 s, laisse la musique jouer)</button></div>
     <label>Caméra <select id="facing"><option value="user">Avant (selfie)</option><option value="environment">Arrière</option></select></label>
     <label>Qualité de rendu <select id="quality"><option value="0.75">Économe</option><option value="1">Normale</option><option value="1.5">Haute</option></select></label>
     <label class="chk"><input type="checkbox" id="hudChk"> Afficher fps et beat</label>
+    <label class="chk"><input type="checkbox" id="strobeChk"> Flash blanc au beat (en plus de l'effet)</label>
+    <p class="hint">Peut déclencher une crise chez les personnes photosensibles à l'épilepsie.</p>
     <div class="btns"><button id="resetBtn">Réinitialiser la configuration</button></div>
   </section>
 </aside>
@@ -149,12 +153,15 @@ const EFFECTS = [
   { id:'neonMilk', name:'Silhouettes sur MilkDrop',   milk:true,  cam:true,  seg:true,  dur:30 },
   { id:'thermal',  name:'Caméra thermique',           milk:false, cam:true,  seg:false, dur:20 },
   { id:'kaleido',  name:'Kaléidoscope caméra',        milk:false, cam:true,  seg:false, dur:20 },
+  { id:'mirror',   name:'Symétrie miroir',            milk:false, cam:true,  seg:false, dur:25 },
+  { id:'feedback', name:'Trainées (feedback)',        milk:false, cam:true,  seg:true,  dur:30 },
+  { id:'glitch',   name:'Glitch RGB',                 milk:false, cam:true,  seg:false, dur:20 },
 ];
 const EFX = Object.fromEntries(EFFECTS.map(e => [e.id, e]));
 
 /* ---------- Configuration (sauvegardée dans le navigateur) ---------- */
 const KEY = 'vjlive.cfg.v1';
-const DEFAULT = { mode:'auto', gain:2, facing:'user', quality:1, hud:true, milkInterval:20, milkPreset:'',
+const DEFAULT = { mode:'auto', gain:2, facing:'user', quality:1, hud:true, milkInterval:20, milkPreset:'', strobe:false,
   playlist: EFFECTS.map(e => ({ id:e.id, on:true, dur:e.dur })) };
 function loadCfg(){
   let c = null; try { c = JSON.parse(localStorage.getItem(KEY)); } catch {}
@@ -312,6 +319,7 @@ void main(){
   float r=length(p), a=atan(p.y,p.x);
   float f=abs(a)/3.14159;
   float v=texture(uFft,vec2(0.02+f*0.6,0.5)).r;
+  v=max(v,0.04+0.03*sin(uTime*1.4+f*7.0));            // légère respiration même sans son
   float r0=0.17+uBass*0.07;
   float bar=smoothstep(r0,r0+0.004,r)*(1.0-smoothstep(r0+v*0.38,r0+v*0.38+0.01,r))*step(0.3,fract(f*72.0));
   vec3 col=hsv(f*0.8+uTime*0.05,0.85,1.0)*bar;
@@ -354,7 +362,8 @@ kaleido: FS(`
 void main(){
   vec2 p=(vUv-0.5)*vec2(uRes.x/uRes.y,1.0);
   float r=length(p), a=atan(p.y,p.x);
-  float s=6.28318/8.0;
+  float seg=6.0+2.0*floor(mod(uTime/12.0,3.0));       // le nombre de pans change toutes les 12 s
+  float s=6.28318/seg;
   a=mod(a+uTime*0.15+uMid*0.5,s); a=abs(a-s*0.5);
   vec2 q=vec2(cos(a),sin(a))*r*(0.9-uBass*0.35-uBeat*0.1);
   vec3 c=texture(uCam,camUV(q+0.5)).rgb;
@@ -362,6 +371,55 @@ void main(){
   c*=1.0+uBeat*0.7;
   o=vec4(c,1.0);
 }`),
+mirror: FS(`
+void main(){
+  vec2 uv=vUv-0.5;
+  float mode=mod(floor(uTime/9.0),4.0);                // symétrie verticale / horizontale / 4 quadrants / radiale, change toutes les 9 s
+  vec2 p=uv;
+  if(mode<1.0){ p.x=abs(p.x); }
+  else if(mode<2.0){ p.y=abs(p.y); }
+  else if(mode<3.0){ p.x=abs(p.x); p.y=abs(p.y); }
+  else { float a=abs(mod(atan(p.y,p.x),1.5708)); p=vec2(cos(a),sin(a))*length(p); }
+  p*=1.0-uBass*0.06-uBeat*0.04;
+  p=vec2(p.x*cos(uBeat*0.1)-p.y*sin(uBeat*0.1), p.x*sin(uBeat*0.1)+p.y*cos(uBeat*0.1));
+  vec3 c=texture(uCam,camUV(p+0.5)).rgb;
+  vec3 tint=hsv(uTime*0.04+length(uv)*0.6,0.55,1.0);
+  c=mix(c,tint*luma(c)*1.4,0.18+uBeat*0.25);
+  o=vec4(c,1.0);
+}`),
+glitch: FS(`
+float rand(vec2 c){ return fract(sin(dot(c,vec2(12.9898,78.233)))*43758.5453); }
+void main(){
+  vec2 uv=vUv;
+  float sliceY=floor(uv.y*24.0)/24.0;
+  float jit=(rand(vec2(sliceY,floor(uTime*6.0)))-0.5)*(0.015+uBeat*0.12+uBass*0.04);
+  uv.x+=jit;
+  vec2 cu=camUV(uv);
+  float off=0.004+uTreb*0.01+uBeat*0.02;
+  float r=texture(uCam,cu+vec2(off,0.0)).r;
+  float g=texture(uCam,cu).g;
+  float b=texture(uCam,cu-vec2(off,0.0)).b;
+  vec3 c=vec3(r,g,b);
+  float bar=step(0.985,rand(vec2(0.0,floor(uTime*10.0))))*step(fract(uv.y*3.0+uTime*2.0),0.08);
+  c=mix(c,1.0-c,bar);
+  c*=0.9+0.3*uBeat;
+  o=vec4(c,1.0);
+}`),
+feedback: FS(`
+uniform sampler2D uPrev;
+void main(){
+  vec2 c=vUv-0.5;
+  float ang=0.012+uBass*0.03; float sc=1.0-0.008-uBass*0.018-uBeat*0.025;
+  mat2 rot=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));
+  vec3 prev=texture(uPrev,rot*c*sc+0.5).rgb*0.93;
+  vec2 cu=camUV(vUv);
+  vec3 cam=texture(uCam,cu).rgb;
+  float m=texture(uMask,cu).r*uUseMask;
+  vec3 fresh=mix(cam*0.4,hsv(uTime*0.08+luma(cam),0.85,1.0)*(0.3+m*0.9),0.55)*(0.2+uTreb*0.4+uBeat*0.7);
+  o=vec4(max(prev,fresh),1.0);
+}`),
+strobe: FS(`
+void main(){ o=vec4(vec3(1.0)*uBeat*uBeat,1.0); }`),
 };
 const CLOUD_VS = `#version 300 es
 ${COMMON}
@@ -392,9 +450,14 @@ function mkProg(vs, fs, attr){ const p=gl.createProgram(); gl.attachShader(p,mkS
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); p.u={}; return p; }
 const U = (p,n) => (n in p.u) ? p.u[n] : (p.u[n] = gl.getUniformLocation(p,n));
 
+const BLIT_FS = `#version 300 es
+precision highp float; uniform sampler2D uTex; in vec2 vUv; out vec4 o;
+void main(){ o=vec4(texture(uTex,vUv).rgb,1.0); }`;
+
 const progs = {};
 for (const k in SHADERS) progs[k] = mkProg(QUAD_VS, SHADERS[k], 'p');
 progs.cloud = mkProg(CLOUD_VS, CLOUD_FS, 'aUv');
+progs.blit = mkProg(QUAD_VS, BLIT_FS, 'p');
 
 const quadVao = gl.createVertexArray(); gl.bindVertexArray(quadVao);
 gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
@@ -412,6 +475,19 @@ function buildCloud(){
   gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
 }
 
+let fboTex = [null,null], fbo = [null,null], fboCur = 0;
+function buildFeedbackFBO(){
+  for (let i=0;i<2;i++){
+    if (fboTex[i]) gl.deleteTexture(fboTex[i]);
+    if (fbo[i]) gl.deleteFramebuffer(fbo[i]);
+    fboTex[i] = mkTex(3+i, gl.RGBA, gl.RGBA, fx.width, fx.height, null);
+    fbo[i] = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[i]);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex[i], 0);
+    gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
 function mkTex(unit, ifmt, fmt, w, h, data){
   const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, t);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -452,10 +528,28 @@ function drawFx(e, t){
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
     gl.bindVertexArray(cloudVao); gl.drawArrays(gl.POINTS, 0, cloudCount); gl.disable(gl.BLEND); return;
   }
+  if (e.id === 'feedback'){
+    const cur = fboCur, prev = 1 - fboCur;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]); gl.viewport(0,0,fx.width,fx.height);
+    gl.disable(gl.BLEND);
+    const p = progs.feedback; gl.useProgram(p); setCommon(p,t); gl.uniform1i(U(p,'uPrev'), 3+prev);
+    gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0,0,fx.width,fx.height);
+    const bp = progs.blit; gl.useProgram(bp); gl.uniform1i(U(bp,'uTex'), 3+cur);
+    gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    fboCur = prev; return;
+  }
   const key = e.id === 'neonMilk' ? 'neon' : e.id, p = progs[key];
   gl.disable(gl.BLEND); gl.useProgram(p); setCommon(p,t);
   gl.uniform1f(U(p,'uTransparent'), e.id === 'neonMilk' ? 1 : 0);
   gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+function drawStrobe(t){
+  if (!cfg.strobe || A.beat < 0.05) return;
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+  const p = progs.strobe; gl.useProgram(p); setCommon(p,t);
+  gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.disable(gl.BLEND);
 }
 
 /* ---------- Lecture / playlist ---------- */
@@ -495,12 +589,14 @@ function frame(now){
   if (e.cam) uploadCam();
   if (e.seg){ ensureSeg(); runSeg(now); }
   uploadFft();
-  drawFx(e, t);
+  drawFx(e, t); drawStrobe(t);
   frames++; if (now - fpsT > 1000){ fps = frames; frames = 0; fpsT = now; }
   if (cfg.hud){ $('#hudTxt').textContent = `${e.name} · ${fps} fps${e.seg && !segReady ? ' · chargement IA…' : ''}`;
     $('#beat').style.transform = `scale(${0.4 + A.beat*1.6})`; }
   if (!$('#admin').hidden){
     $('#mB').style.setProperty('--v', A.bass); $('#mM').style.setProperty('--v', A.mid); $('#mT').style.setProperty('--v', A.treb);
+    const pc = v => Math.round(v*100) + '%';
+    $('#meterTxt').textContent = `Basses ${pc(A.bass)} · Médiums ${pc(A.mid)} · Aigus ${pc(A.treb)}`;
   }
 }
 
@@ -509,7 +605,7 @@ function resize(){
   const w = Math.round(innerWidth*cfg.quality), h = Math.round(innerHeight*cfg.quality);
   for (const c of [milkCanvas, fx]){ c.width = w; c.height = h; }
   if (viz) viz.setRendererSize(w, h);
-  buildCloud();
+  buildCloud(); buildFeedbackFBO();
 }
 addEventListener('resize', resize);
 function goFullscreen(){ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if (f) Promise.resolve(f.call(d,{navigationUI:'hide'})).catch(()=>{}); }
@@ -577,6 +673,7 @@ function syncAdmin(){
   $('#presetSel').value = cfg.milkPreset; $('#milkInt').value = cfg.milkInterval;
   $('#gain').value = cfg.gain; $('#gainV').textContent = cfg.gain + '×';
   $('#facing').value = cfg.facing; $('#quality').value = String(cfg.quality); $('#hudChk').checked = cfg.hud;
+  $('#strobeChk').checked = cfg.strobe;
 }
 document.querySelectorAll('.segm button').forEach(b => b.onclick = () => { cfg.mode = b.dataset.mode; since = performance.now(); save(); syncMode(); });
 $('#prevBtn').onclick = () => step(-1);
@@ -589,6 +686,20 @@ sel.onchange = () => { cfg.milkPreset = sel.value; save(); loadPreset(cfg.milkPr
 $('#milkInt').onchange = ev => { cfg.milkInterval = Math.max(3, +ev.target.value || 20); save(); };
 $('#nextPreset').onclick = () => { cfg.milkPreset = ''; sel.value = ''; save(); loadPreset(null, 1.5); };
 $('#gain').oninput = ev => { cfg.gain = +ev.target.value; $('#gainV').textContent = cfg.gain + '×'; if (gainNode) gainNode.gain.value = cfg.gain; save(); };
+$('#calBtn').onclick = () => {
+  const btn = $('#calBtn'), dur = 2000, start = performance.now(), samples = [];
+  btn.disabled = true; btn.textContent = 'Calibration…';
+  (function step(){
+    samples.push(A.bass);
+    if (performance.now() - start < dur) { requestAnimationFrame(step); return; }
+    const avg = samples.reduce((a,b) => a+b, 0) / samples.length || 0.02;
+    cfg.gain = Math.min(8, Math.max(0.5, cfg.gain * (0.4 / Math.max(avg, 0.03))));
+    if (gainNode) gainNode.gain.value = cfg.gain;
+    save(); $('#gain').value = cfg.gain; $('#gainV').textContent = cfg.gain.toFixed(1) + '×';
+    btn.disabled = false; btn.textContent = 'Calibrer (2 s, laisse la musique jouer)';
+  })();
+};
+$('#strobeChk').onchange = ev => { cfg.strobe = ev.target.checked; save(); };
 $('#facing').onchange = async ev => { cfg.facing = ev.target.value; save(); try { await openMedia(); } catch (e) { err('Caméra : ' + e.message); } };
 $('#quality').onchange = ev => { cfg.quality = +ev.target.value; save(); resize(); };
 $('#hudChk').onchange = ev => { cfg.hud = ev.target.checked; $('#hud').hidden = !cfg.hud; save(); };
