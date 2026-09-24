@@ -32,6 +32,8 @@
   #start h1{margin:0;font-size:44px;letter-spacing:-.02em;background:linear-gradient(90deg,var(--pink),var(--cyan));
     -webkit-background-clip:text;background-clip:text;color:transparent}
   #start p{margin:0;color:var(--dim);max-width:34ch}
+  #status{min-height:1.4em;color:var(--cyan)}
+  #startBtn:disabled{opacity:.5}
   #startBtn{font-size:20px;padding:16px 36px;border-radius:40px;border:0;background:var(--pink);color:#fff;font-weight:600}
 
   #admin{position:fixed;z-index:8;top:0;right:0;bottom:0;width:min(440px,100vw);background:rgba(22,16,42,.96);
@@ -76,7 +78,7 @@
 <body>
 <canvas id="milk"></canvas>
 <canvas id="fx"></canvas>
-<video id="cam" playsinline muted></video>
+<video id="cam" playsinline muted autoplay></video>
 
 <div id="hud" hidden><span id="beat"></span><span id="hudTxt"></span></div>
 <button id="adminBtn" class="hide" aria-label="Ouvrir le menu">☰</button>
@@ -85,6 +87,7 @@
   <h1>VJ Live</h1>
   <p>Le micro écoute la musique de la pièce, la caméra filme la scène. Autorise les deux au démarrage.</p>
   <button id="startBtn">Démarrer</button>
+  <p id="status" aria-live="polite"></p>
 </div>
 
 <aside id="admin" hidden>
@@ -165,12 +168,11 @@ function save(){ try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {
 /* ---------- Audio ---------- */
 let actx, gainNode, analyser, freq, wave;
 const A = { bass:0, mid:0, treb:0, vol:0, beat:0, bassAvg:0.1, lastBeat:0 };
-async function startAudio(){
-  const s = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false }, video:false });
-  const src = actx.createMediaStreamSource(s);
+function buildAudioGraph(){
+  actx = new (window.AudioContext || window.webkitAudioContext)();
   gainNode = actx.createGain(); gainNode.gain.value = cfg.gain;
   analyser = actx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.5;
-  src.connect(gainNode); gainNode.connect(analyser);   // pas de sortie haut-parleur (évite le larsen)
+  gainNode.connect(analyser);   // pas de sortie haut-parleur (évite le larsen)
   freq = new Uint8Array(analyser.frequencyBinCount);
   wave = new Uint8Array(analyser.fftSize);
 }
@@ -190,13 +192,45 @@ function updateAudio(now){
 }
 
 /* ---------- Caméra ---------- */
-const video = $('#cam'); let camStream = null;
-async function startCam(){
-  if (camStream) camStream.getTracks().forEach(t => t.stop());
-  camStream = await navigator.mediaDevices.getUserMedia({ audio:false,
-    video:{ facingMode:cfg.facing, width:{ ideal:640 }, height:{ ideal:480 } } });
-  video.srcObject = camStream; await video.play();
+const video = $('#cam');
+let media = null, micSrc = null, mediaStarting = false, appStarted = false;
+function stopMedia(){
+  if (media){ media.getTracks().forEach(t => { try { t.stop(); } catch {} }); media = null; }
+  if (micSrc){ try { micSrc.disconnect(); } catch {} micSrc = null; }
+  video.srcObject = null;
 }
+function mediaAlive(){ return !!media && media.getTracks().every(t => t.readyState === 'live'); }
+async function openMedia(){
+  if (mediaStarting) return; mediaStarting = true;
+  try {
+    stopMedia();
+    const audio = { echoCancellation:false, noiseSuppression:false, autoGainControl:false };
+    const vid = { facingMode:{ ideal:cfg.facing }, width:{ ideal:640 }, height:{ ideal:480 } };
+    let s;
+    try { s = await navigator.mediaDevices.getUserMedia({ audio, video:vid }); }
+    catch (e) { err('Caméra indisponible, micro seul : ' + e.message); s = await navigator.mediaDevices.getUserMedia({ audio, video:false }); }
+    media = s;
+    micSrc = actx.createMediaStreamSource(s); micSrc.connect(gainNode);
+    const vt = s.getVideoTracks()[0];
+    if (vt){
+      video.srcObject = s; video.play().catch(() => {});      // pas d'await : ne bloque jamais le démarrage
+      vt.addEventListener('ended', () => { if (appStarted && !document.hidden && media === s) openMedia(); });
+    }
+  } finally { mediaStarting = false; }
+}
+function resumeApp(){
+  if (!appStarted || document.hidden) return;
+  actx.resume().catch(() => {});
+  if (!mediaAlive()) openMedia().catch(e => err('Reprise micro/caméra : ' + e.message));
+  keepAwake();
+}
+document.addEventListener('visibilitychange', () => {
+  if (!appStarted) return;
+  if (document.hidden){ stopMedia(); actx.suspend().catch(() => {}); }
+  else resumeApp();
+});
+addEventListener('pageshow', resumeApp);
+addEventListener('focus', resumeApp);
 
 /* ---------- MilkDrop (Butterchurn) ---------- */
 const milkCanvas = $('#milk');
@@ -477,28 +511,39 @@ function resize(){
   buildCloud();
 }
 addEventListener('resize', resize);
-function goFullscreen(){ const d=document.documentElement; (d.requestFullscreen?.({navigationUI:'hide'}) || Promise.resolve()).catch(()=>{}); }
+function goFullscreen(){ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if (f) Promise.resolve(f.call(d,{navigationUI:'hide'})).catch(()=>{}); }
 let wakeLock = null;
 async function keepAwake(){ try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
 
 /* ---------- Démarrage ---------- */
+const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function status(t){ $('#status').textContent = t; }
+let booting = false;
 $('#startBtn').onclick = async () => {
-  goFullscreen();
-  actx = new (window.AudioContext || window.webkitAudioContext)();
-  try { await startAudio(); } catch (e) { err('Micro refusé ou indisponible : ' + e.message); return; }
-  try { await startCam(); } catch (e) { err('Caméra indisponible : ' + e.message); }
-  resize(); initMilk(); keepAwake();
-  $('#start').hidden = true; $('#hud').hidden = !cfg.hud;
-  const first = cfg.playlist.find(p => p.on) || cfg.playlist[0];
-  setEffect(first.id); showAdminBtn();
-  requestAnimationFrame(frame);
+  if (booting || appStarted) return;
+  booting = true; $('#startBtn').disabled = true;
+  try {
+    if (!actx) buildAudioGraph();
+    status('Autorise le micro et la caméra…');
+    try { await openMedia(); }
+    catch (e) { status('Micro refusé ou indisponible : ' + e.message); return; }
+    await actx.resume().catch(() => {});
+    status('Chargement des effets…');
+    resize();
+    try { initMilk(); } catch (e) { err('MilkDrop : ' + e.message); }
+    appStarted = true; keepAwake();
+    $('#start').hidden = true; $('#hud').hidden = !cfg.hud;
+    const first = cfg.playlist.find(p => p.on) || cfg.playlist[0];
+    setEffect(first.id); showAdminBtn();
+    requestAnimationFrame(frame);
+    goFullscreen();               // peut être refusé ici : un simple toucher sur l'écran le relance
+  } finally { booting = false; $('#startBtn').disabled = false; }
 };
 
 /* ---------- Menu d'administration ---------- */
 let hideT;
 function showAdminBtn(){ const b=$('#adminBtn'); b.classList.remove('hide'); clearTimeout(hideT); hideT=setTimeout(()=>b.classList.add('hide'),3000); }
-fx.addEventListener('pointerdown', showAdminBtn);
+fx.addEventListener('pointerdown', () => { if (appStarted && !fsOn()) goFullscreen(); showAdminBtn(); });
 $('#adminBtn').onclick = () => { $('#admin').hidden = false; syncAdmin(); };
 $('#closeAdmin').onclick = () => { $('#admin').hidden = true; showAdminBtn(); };
 
@@ -538,7 +583,7 @@ sel.onchange = () => { cfg.milkPreset = sel.value; save(); loadPreset(cfg.milkPr
 $('#milkInt').onchange = ev => { cfg.milkInterval = Math.max(3, +ev.target.value || 20); save(); };
 $('#nextPreset').onclick = () => { cfg.milkPreset = ''; sel.value = ''; save(); loadPreset(null, 1.5); };
 $('#gain').oninput = ev => { cfg.gain = +ev.target.value; $('#gainV').textContent = cfg.gain + '×'; if (gainNode) gainNode.gain.value = cfg.gain; save(); };
-$('#facing').onchange = async ev => { cfg.facing = ev.target.value; save(); try { await startCam(); } catch (e) { err('Caméra : ' + e.message); } };
+$('#facing').onchange = async ev => { cfg.facing = ev.target.value; save(); try { await openMedia(); } catch (e) { err('Caméra : ' + e.message); } };
 $('#quality').onchange = ev => { cfg.quality = +ev.target.value; save(); resize(); };
 $('#hudChk').onchange = ev => { cfg.hud = ev.target.checked; $('#hud').hidden = !cfg.hud; save(); };
 $('#resetBtn').onclick = () => { cfg = structuredClone(DEFAULT); save(); if (gainNode) gainNode.gain.value = cfg.gain; resize(); syncAdmin(); };
