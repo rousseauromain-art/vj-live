@@ -29,6 +29,7 @@
 
   #start{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
     background:radial-gradient(circle at 50% 45%,#2a0f45 0%,#000 70%);text-align:center;padding:24px}
+  #start[hidden]{display:none}
   #start h1{margin:0;font-size:44px;letter-spacing:-.02em;background:linear-gradient(90deg,var(--pink),var(--cyan));
     -webkit-background-clip:text;background-clip:text;color:transparent}
   #start p{margin:0;color:var(--dim);max-width:34ch}
@@ -518,26 +519,31 @@ async function keepAwake(){ try { wakeLock = await navigator.wakeLock?.request('
 /* ---------- Démarrage ---------- */
 const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
 function status(t){ $('#status').textContent = t; }
-let booting = false;
+let booting = false, lastStep = 'départ';
 $('#startBtn').onclick = async () => {
   if (booting || appStarted) return;
   booting = true; $('#startBtn').disabled = true;
+  const watchdog = setTimeout(() => {
+    if (!appStarted) status(`Ça bloque après « ${lastStep} ». Fais une capture d'écran pour le retour.`);
+  }, 8000);
   try {
-    if (!actx) buildAudioGraph();
-    status('Autorise le micro et la caméra…');
+    lastStep = 'contexte audio'; if (!actx) buildAudioGraph();
+    lastStep = 'micro/caméra'; status('Autorise le micro et la caméra…');
     try { await openMedia(); }
     catch (e) { status('Micro refusé ou indisponible : ' + e.message); return; }
-    await actx.resume().catch(() => {});
-    status('Chargement des effets…');
-    resize();
-    try { initMilk(); } catch (e) { err('MilkDrop : ' + e.message); }
+    lastStep = 'reprise audio'; await actx.resume().catch(() => {});
+    lastStep = 'redimensionnement'; status('Chargement des effets…'); resize();
+    lastStep = 'MilkDrop'; try { initMilk(); } catch (e) { err('MilkDrop : ' + e.message); }
+    lastStep = 'premier effet';
     appStarted = true; keepAwake();
     $('#start').hidden = true; $('#hud').hidden = !cfg.hud;
     const first = cfg.playlist.find(p => p.on) || cfg.playlist[0];
     setEffect(first.id); showAdminBtn();
     requestAnimationFrame(frame);
     goFullscreen();               // peut être refusé ici : un simple toucher sur l'écran le relance
-  } finally { booting = false; $('#startBtn').disabled = false; }
+  } catch (e) {
+    status(`Erreur après « ${lastStep} » : ${e.message}`);
+  } finally { clearTimeout(watchdog); booting = false; $('#startBtn').disabled = false; }
 };
 
 /* ---------- Menu d'administration ---------- */
