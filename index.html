@@ -223,7 +223,7 @@
 <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js"></script>
 
 <script type="module">
-const APP_VERSION = '0.7 — 26/09/2026';
+const APP_VERSION = '0.8 — 26/09/2026';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const nowS = () => performance.now() / 1000;
@@ -262,12 +262,13 @@ const EAR_CFG = {
   buildBars: 3,     // montée : durée minimale (mesures) avant de déclarer BUILD
   gapDrop: 9,       // trou : chute d'énergie rapide (dB) pendant une montée sans kick
   envKick: 1, envFlux: 3,    // poids de l'enveloppe d'onsets pour le tempo
+  onsetMargin: 20,  // un onset doit dépasser le plancher de bruit ambiant (kickFloor) d'au moins ceci, en dB — évite un faux tempo/drop au repos (silence + gain micro élevé) ; validé sans faux positif sur du bruit ambiant type et sans régression sur les 3 pistes de référence
 };
 function createEar(profileId){
   const E = {
     profile: profileId || 'club',
     kickDb:-120, kickSlow:-120, fullFast:-120, fullSlow:-120, hiDb:-120, hiSlow:-120, centroid:0, cSmooth:0,
-    ref:-60, present:false, lastStrong:0, lastKick:0,
+    ref:-60, kickFloor:-120, present:false, lastStrong:0, lastKick:0,
     bpm:0, conf:0, locked:false, T:0.46, cand:0, candN:0,
     beat:0, lastBeatT:0, nextBeatT:0, barAnchor:0,
     state:'INTRO', since:0, absentSince:0, buildSince:0, buildingSince:0, building:false, fromBreak:false,
@@ -365,6 +366,9 @@ function createEar(profileId){
     E.fullSlow = E.fullSlow < -119 ? fullDb : ema(E.fullSlow, fullDb, dt, 3.0);
     E.hiSlow = E.hiSlow < -119 ? E.hiDb : ema(E.hiSlow, E.hiDb, dt, 0.5);
     E.cSmooth = E.cSmooth ? ema(E.cSmooth, E.centroid, dt, 0.5) : E.centroid;
+    // plancher de bruit ambiant (descend vite si ça baisse, remonte lentement) : sert à distinguer un vrai kick
+    // d'un souffle/bruit de fond, quel que soit le gain micro (contrairement à un seuil en dB fixe)
+    E.kickFloor = E.kickFloor < -119 ? E.kickSlow : ema(E.kickFloor, E.kickSlow, dt, E.kickSlow < E.kickFloor ? 0.6 : 15.0);
 
     // enveloppe d'onsets pour le tempo
     E._envT.push(now); E._env.push(EAR_CFG.envKick * kOn + EAR_CFG.envFlux * flux);
@@ -375,7 +379,8 @@ function createEar(profileId){
     let mu = 0, sd = 0; for (const [, v] of E._kOn) mu += v; mu /= E._kOn.length;
     for (const [, v] of E._kOn) sd += (v - mu) * (v - mu); sd = Math.sqrt(sd / E._kOn.length);
     const refr = E.bpm ? 0.45 * E.T : 0.2;
-    if (kOn > mu + EAR_CFG.kOnK * sd && kOn > EAR_CFG.kOnMin && now - E.lastKick > refr && E.kickDb > E.ref - 18){
+    if (kOn > mu + EAR_CFG.kOnK * sd && kOn > EAR_CFG.kOnMin && now - E.lastKick > refr && E.kickDb > E.ref - 18
+        && E.kickDb > E.kickFloor + EAR_CFG.onsetMargin){
       E.lastKick = now;
       if (!E.present && !E._firstOnset && E.kickDb > E.ref - EAR_CFG.presentDb) E._firstOnset = now;
       const strong = E.kickDb > E.ref - EAR_CFG.strongDb;
@@ -650,17 +655,24 @@ function milkVisible(){ const e = EFX[curId]; return !!e && (e.id === 'milk' || 
 /* ---------- Segmentation des personnes (MediaPipe, limitée à 15 Hz) ---------- */
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const SEG_MODEL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
-let segmenter = null, segLoading = false, segFailed = false, segReady = false, lastVT = -1, maskU8 = null, lastSegRun = 0, segCount = 0;
+let segmenter = null, segLoading = false, segFailCount = 0, segFailAt = 0, segReady = false, lastVT = -1, maskU8 = null, lastSegRun = 0, segCount = 0;
+const SEG_RETRY_MS = 25000, SEG_MAX_TRIES = 5;   // un échec (réseau, wasm...) ne doit pas désactiver la fonction pour toute la soirée
+function segGaveUp(){ return segFailCount >= SEG_MAX_TRIES; }
 async function ensureSeg(){
-  if (segmenter || segLoading || segFailed) return; segLoading = true;
+  if (segmenter || segLoading || segGaveUp()) return;
+  if (segFailCount > 0 && performance.now() - segFailAt < SEG_RETRY_MS) return;
+  segLoading = true;
   try {
     const { FilesetResolver, ImageSegmenter } = await import(MP + '/vision_bundle.mjs');
     const fs = await FilesetResolver.forVisionTasks(MP + '/wasm');
     const opts = d => ({ baseOptions:{ modelAssetPath:SEG_MODEL, delegate:d }, runningMode:'VIDEO', outputCategoryMask:false, outputConfidenceMasks:true });
     try { segmenter = await ImageSegmenter.createFromOptions(fs, opts('GPU')); }
     catch { segmenter = await ImageSegmenter.createFromOptions(fs, opts('CPU')); }
-    logEvent('ia-prete');
-  } catch (e) { segFailed = true; err('Segmentation indisponible : ' + e.message); }
+    logEvent('ia-prete'); segFailCount = 0;
+  } catch (e) {
+    segFailCount++; segFailAt = performance.now();
+    err(`Segmentation indisponible (essai ${segFailCount}/${SEG_MAX_TRIES}${segGaveUp() ? ', abandon' : ', nouvel essai dans ' + Math.round(SEG_RETRY_MS / 1000) + ' s'}) : ${e.message}`);
+  }
   segLoading = false;
 }
 function runSeg(nowMs){
@@ -1440,14 +1452,14 @@ function updateHud(now){
   const info = ear.info(now / 1000), st = effState();
   if (cfg.hud){
     setDots($('#hudDots'), info.inBar);
-    $('#hudTxt').textContent = `${EFX[curId].name} · ${PERF.fps.toFixed(0)} fps · ${ear.bpm ? ear.bpm.toFixed(1) + ' BPM' : 'BPM ?'} · ${ST_FR[st] || st}${symActive(EFX[curId]) ? ' · ' + SYM_FR[DYN.sym] : ''}${DYN.hold ? ' · figé' : ''}${EFX[curId].seg && !segReady && !segFailed ? ' · chargement IA…' : ''}`;
+    $('#hudTxt').textContent = `${EFX[curId].name} · ${PERF.fps.toFixed(0)} fps · ${ear.bpm ? ear.bpm.toFixed(1) + ' BPM' : 'BPM ?'} · ${ST_FR[st] || st}${symActive(EFX[curId]) ? ' · ' + SYM_FR[DYN.sym] : ''}${DYN.hold ? ' · figé' : ''}${EFX[curId].seg && !segReady && !segGaveUp() ? ' · chargement IA…' : ''}`;
   }
   if (cfg.debug){
     const L = PERF.last; if (L.ms){
       const lines = MODS.map(([k, n]) => `${n.padEnd(11)} ${String(L.ms[k]).padStart(6)} ms  max ${String(L.mx[k]).padStart(5)}`);
       $('#dbg').textContent = `${L.fps.toFixed(1)} fps · images > 33 ms : ${L.long}/s · pire ${L.dtMax.toFixed(0)} ms\n` + lines.join('\n') +
         `\nIA ${L.segHz.toFixed(1)} Hz · rendu ${fx.width}×${fx.height} · MilkDrop ${milkCanvas.width}×${milkCanvas.height}` +
-        `\nkick ${ear.kickSlow.toFixed(1)} dB / réf ${ear.ref.toFixed(1)} · présent ${ear.present ? 'oui' : 'non'} · pente ${ear.cSlope.toFixed(0)} Hz/s`;
+        `\nkick ${ear.kickSlow.toFixed(1)} dB / réf ${ear.ref.toFixed(1)} / plancher ${ear.kickFloor.toFixed(1)} · présent ${ear.present ? 'oui' : 'non'} · pente ${ear.cSlope.toFixed(0)} Hz/s`;
     }
   }
   $('#pMode').textContent = { auto:'Auto', playlist:'Playlist', manual:'Manuel' }[cfg.mode];
