@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <link rel="manifest" href="manifest.webmanifest">
-<title>VJ Live — prototype</title>
+<title>VJ Live</title>
 <style>
   :root{
     --stage:#000; --panel:#16102a; --panel2:#221a3d; --line:#3a2f63;
-    --txt:#ece8ff; --dim:#9d93c7; --pink:#ff3da8; --cyan:#37e2ff; --lime:#b6ff3b;
+    --txt:#ece8ff; --dim:#9d93c7; --pink:#ff3da8; --cyan:#37e2ff; --lime:#b6ff3b; --amber:#ffc23d;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--stage);color:var(--txt);
@@ -20,12 +20,23 @@
   #cam{position:fixed;width:2px;height:2px;opacity:0;pointer-events:none;left:0;top:0}
 
   #hud{position:fixed;z-index:5;left:calc(12px + env(safe-area-inset-left));bottom:calc(10px + env(safe-area-inset-bottom));
-    font-size:12px;color:#fff;opacity:.75;text-shadow:0 0 4px #000;pointer-events:none;display:flex;gap:8px;align-items:center}
-  #beat{width:10px;height:10px;border-radius:50%;background:var(--pink)}
-  #adminBtn{position:fixed;z-index:6;right:calc(14px + env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top));
-    width:48px;height:48px;border-radius:50%;border:1px solid var(--line);background:rgba(22,16,42,.8);color:var(--txt);
-    font-size:22px;transition:opacity .4s}
-  #adminBtn.hide{opacity:0;pointer-events:none}
+    font-size:12px;color:#fff;opacity:.8;text-shadow:0 0 4px #000;pointer-events:none;display:flex;gap:8px;align-items:center}
+  #hud[hidden]{display:none}
+  body.padsOn #hud{bottom:calc(108px + env(safe-area-inset-bottom))}
+  .dots{display:inline-flex;gap:4px}
+  .dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.25)}
+  .dots i.on{background:var(--pink)} .dots i.one.on{background:var(--cyan)}
+  .dots.big i{width:14px;height:14px}
+  #dbg{position:fixed;z-index:5;left:calc(8px + env(safe-area-inset-left));top:calc(8px + env(safe-area-inset-top));margin:0;
+    font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#d8ffd0;background:rgba(0,0,0,.6);padding:6px 8px;border-radius:6px;pointer-events:none;white-space:pre}
+  #dbg[hidden]{display:none}
+
+  #pads{position:fixed;z-index:6;left:0;right:0;bottom:calc(8px + env(safe-area-inset-bottom));display:flex;gap:6px;justify-content:center;
+    flex-wrap:wrap;padding:0 8px;transition:opacity .3s}
+  #pads.hide{opacity:0;pointer-events:none}
+  #pads button{min-width:56px;min-height:44px;border-radius:10px;background:rgba(22,16,42,.82);border:1px solid var(--line);font-weight:600}
+  #pads button.on{background:var(--pink);border-color:var(--pink);color:#fff}
+  #pDrop{border-color:var(--pink)!important} #pCO2{border-color:var(--cyan)!important}
 
   #start{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
     background:radial-gradient(circle at 50% 45%,#2a0f45 0%,#000 70%);text-align:center;padding:24px}
@@ -34,22 +45,28 @@
     -webkit-background-clip:text;background-clip:text;color:transparent}
   #start p{margin:0;color:var(--dim);max-width:34ch}
   #status{min-height:1.4em;color:var(--cyan)}
-  #startBtn:disabled{opacity:.5}
   #startBtn{font-size:20px;padding:16px 36px;border-radius:40px;border:0;background:var(--pink);color:#fff;font-weight:600}
+  #startBtn:disabled{opacity:.5}
 
-  #admin{position:fixed;z-index:8;top:0;right:0;bottom:0;width:min(440px,100vw);background:rgba(22,16,42,.96);
+  #admin{position:fixed;z-index:8;top:0;right:0;bottom:0;width:min(460px,100vw);background:rgba(22,16,42,.97);
     border-left:1px solid var(--line);overflow-y:auto;padding:calc(12px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
     -webkit-user-select:auto;user-select:auto}
   #admin[hidden]{display:none}
-  #admin header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  #admin header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
   #admin h1{font-size:20px;margin:0}
-  #admin h2{font-size:15px;margin:20px 0 8px;color:var(--cyan);font-weight:600}
+  #admin h2{font-size:15px;margin:18px 0 8px;color:var(--cyan);font-weight:600}
   #admin section{border-top:1px solid var(--line)}
+  .tabs{display:flex;gap:0;margin-bottom:4px}
+  .tabs button{flex:1;border-radius:0;padding:10px}
+  .tabs button:first-child{border-radius:8px 0 0 8px}.tabs button:last-child{border-radius:0 8px 8px 0}
+  .tabs button.on{background:var(--cyan);border-color:var(--cyan);color:#000;font-weight:600}
+  .tab[hidden]{display:none}
   .hint{color:var(--dim);font-size:12.5px;margin:0 0 8px}
   button{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
   button:active{transform:scale(.97)}
+  button:disabled{opacity:.5}
   button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
   .segm{display:flex;gap:0;margin-bottom:8px}
   .segm button{flex:1;border-radius:0}
   .segm button:first-child{border-radius:8px 0 0 8px}.segm button:last-child{border-radius:0 8px 8px 0}
@@ -59,21 +76,37 @@
   select,input[type=number]{font:inherit;color:var(--txt);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
   select{max-width:62%}
   input[type=range]{flex:1;accent-color:var(--pink)}
-  .row{display:grid;grid-template-columns:1fr auto auto auto auto;gap:6px;align-items:center;padding:8px;border:1px solid var(--line);
+  .row{display:grid;grid-template-columns:1fr auto auto auto;gap:6px;align-items:center;padding:8px;border:1px solid var(--line);
     border-radius:10px;margin-bottom:6px;background:rgba(255,255,255,.02)}
   .row.cur{border-color:var(--pink);box-shadow:inset 3px 0 0 var(--pink)}
   .row .name{grid-column:1/-1;display:flex;align-items:center;gap:8px;margin:0;justify-content:flex-start}
   .row .name small{color:var(--dim)}
-  .row input[type=number]{width:70px}
+  .row select{max-width:none;font-size:13px;padding:4px 6px}
+  .row input[type=number]{width:58px}
+  .row .cell{display:flex;align-items:center;gap:4px;white-space:nowrap}
+  .row .cell button{padding:6px 9px}
+  .row .go{padding:6px 10px}
+  .row select{min-width:0}
   .row .go{background:var(--pink);border-color:var(--pink);color:#fff}
-  .chk{justify-content:flex-start} .chk input{width:20px;height:20px;accent-color:var(--pink)}
-  .meter{display:flex;gap:6px;height:8px;margin:4px 0 10px}
+  .chk{justify-content:flex-start} .chk input{width:20px;height:20px;accent-color:var(--pink);flex:none}
+  .meter{display:flex;gap:6px;height:8px;margin:4px 0 6px}
   .meter i{flex:1;background:var(--panel2);border-radius:4px;position:relative;overflow:hidden}
   .meter i::after{content:"";position:absolute;inset:0;transform-origin:left;transform:scaleX(var(--v,0));background:var(--c)}
   #mB{--c:var(--pink)} #mM{--c:var(--cyan)} #mT{--c:var(--lime)}
+  .dash{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:4px 0 8px}
+  .dash > div{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+  .dash small{color:var(--dim);font-size:12px}
+  .big{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  .chip{display:inline-block;padding:4px 10px;border-radius:14px;font-weight:700;background:var(--panel2)}
+  .st-BREAK{background:#3a6df0;color:#fff} .st-BUILD{background:var(--amber);color:#000} .st-GAP{background:#fff;color:#000}
+  .st-DROP{background:var(--pink);color:#fff} .st-GROOVE{background:#2fbf71;color:#000} .st-INTRO{background:var(--panel2)}
+  .evlist{margin:0 0 8px;padding-left:18px;color:var(--dim);font-size:12.5px}
+  table.bench{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0}
+  table.bench td,table.bench th{border-bottom:1px solid var(--line);padding:3px 4px;text-align:left}
+  table.bench td.num{text-align:right;font-variant-numeric:tabular-nums}
   #log{position:fixed;z-index:20;left:8px;right:8px;top:calc(8px + env(safe-area-inset-top));font-size:12px;pointer-events:none}
   #log div{background:rgba(160,0,40,.9);color:#fff;padding:6px 10px;border-radius:6px;margin-bottom:4px}
-  @media (prefers-reduced-motion:reduce){#adminBtn{transition:none}}
+  @media (prefers-reduced-motion:reduce){#pads{transition:none}}
 </style>
 </head>
 <body>
@@ -81,8 +114,21 @@
 <canvas id="fx"></canvas>
 <video id="cam" playsinline muted autoplay></video>
 
-<div id="hud" hidden><span id="beat"></span><span id="hudTxt"></span></div>
-<button id="adminBtn" class="hide" aria-label="Ouvrir le menu">☰</button>
+<div id="hud" hidden><span class="dots" id="hudDots"><i class="one"></i><i></i><i></i><i></i></span><span id="hudTxt"></span></div>
+<pre id="dbg" hidden></pre>
+
+<div id="pads" class="hide">
+  <button id="pMode">Auto</button>
+  <button id="pTap">Tap</button>
+  <button id="pBreak">Break</button>
+  <button id="pBuild">Montée</button>
+  <button id="pDrop">Drop</button>
+  <button id="pCO2">CO2</button>
+  <button id="pHold">Figer</button>
+  <button id="pSym">Miroir</button>
+  <button id="pNext">Suivant</button>
+  <button id="pMenu" aria-label="Réglages">☰</button>
+</div>
 
 <div id="start">
   <h1>VJ Live</h1>
@@ -92,46 +138,83 @@
 </div>
 
 <aside id="admin" hidden>
-  <header><h1>Réglages du show</h1><button id="closeAdmin" aria-label="Fermer">✕</button></header>
+  <header><h1>VJ Live</h1><button id="closeAdmin" aria-label="Fermer">✕</button></header>
+  <nav class="tabs"><button data-tab="show" class="on">Show</button><button data-tab="fx">Effets</button><button data-tab="set">Réglages</button></nav>
 
-  <section>
-    <h2>Lecture</h2>
-    <div class="segm"><button data-mode="auto">Playlist auto</button><button data-mode="manual">Manuel</button></div>
-    <div class="now">En cours : <b id="curName">—</b></div>
-    <div class="btns">
-      <button id="prevBtn">◀ Précédent</button><button id="nextBtn">Suivant ▶</button><button id="fsBtn">Plein écran</button>
-    </div>
-  </section>
+  <div class="tab" data-tab="show">
+    <section>
+      <h2>Pilotage</h2>
+      <div class="segm" id="modeSeg"><button data-mode="auto">Auto</button><button data-mode="playlist">Playlist</button><button data-mode="manual">Manuel</button></div>
+      <p class="hint" id="modeHint"></p>
+      <div class="now">En cours : <b id="curName">—</b></div>
+      <div class="btns"><button id="prevBtn">◀ Précédent</button><button id="nextBtn">Suivant ▶</button><button id="fsBtn">Plein écran</button></div>
+    </section>
+    <section>
+      <h2>Ce que l'app entend</h2>
+      <div class="dash">
+        <div><span class="big" id="dBpm">—</span><small>BPM</small></div>
+        <div><span class="chip" id="dState">—</span><small id="dConf"></small></div>
+        <div><span class="dots big" id="dDots"><i class="one"></i><i></i><i></i><i></i></span><small id="dBar"></small></div>
+      </div>
+      <p class="hint" id="dInfo"></p>
+      <ol class="evlist" id="dEvents"></ol>
+      <label>Style musical <select id="profile"></select></label>
+      <label>Rythme des changements <select id="pace">
+        <option value="calme">Calme : effet toutes les 64 mesures</option>
+        <option value="normal">Normal : effet /32 mesures, mode /16</option>
+        <option value="nerveux">Nerveux : effet /16 mesures, mode /8</option></select></label>
+      <div class="btns"><button id="tapBtn">Tap tempo</button></div>
+    </section>
+    <section>
+      <h2>Effets spéciaux</h2>
+      <label class="chk"><input type="checkbox" id="co2Auto"> CO2 automatique après une grosse montée (au plus 1 fois toutes les 10 min)</label>
+      <label>Symétrie sur les visuels <select id="symGen"><option value="auto">Auto : change à la phrase</option><option value="always">Toujours</option><option value="off">Jamais</option></select></label>
+      <label class="chk"><input type="checkbox" id="strobeChk"> Flashs blancs sur les kicks du drop (au plus 3 par seconde)</label>
+      <p class="hint">Les flashs peuvent gêner les personnes photosensibles.</p>
+    </section>
+  </div>
 
-  <section>
-    <h2>Effets et playlist</h2>
-    <p class="hint">Case cochée : l'effet passe dans la playlist. Durée en secondes, flèches pour l'ordre, « Tester » pour lancer l'effet seul (passe en manuel).</p>
-    <div id="plist"></div>
-  </section>
+  <div class="tab" data-tab="fx" hidden>
+    <section>
+      <h2>Effets</h2>
+      <p class="hint">Case cochée : l'effet peut être choisi par Auto et par Playlist. Humeur : les moments où Auto peut le choisir. Durée : utilisée seulement en Playlist. « Tester » passe en Manuel.</p>
+      <div id="plist"></div>
+    </section>
+    <section>
+      <h2>MilkDrop</h2>
+      <label class="chk"><input type="checkbox" id="milkBgChk"> Rester en fond sous les autres effets</label>
+      <label>Preset <select id="presetSel"><option value="">Aléatoire</option></select></label>
+      <p class="hint" id="presetName"></p>
+      <div class="btns"><button id="pmCalm">★ Calme</button><button id="pmEnergy">★ Énergique</button><button id="pmOff">✕ Exclure</button><button id="nextPreset">Preset suivant</button></div>
+      <p class="hint" id="presetStats"></p>
+      <label>Changement de preset en Playlist et Manuel (s) <input type="number" id="milkInt" min="5" max="600"></label>
+    </section>
+  </div>
 
-  <section>
-    <h2>MilkDrop</h2>
-    <label class="chk"><input type="checkbox" id="milkBgChk"> Rester en fond sous les effets caméra</label>
-    <p class="hint">Un seul réglage pour tous les effets caméra : plus besoin de doublons « seul » / « sur MilkDrop ».</p>
-    <label>Preset <select id="presetSel"><option value="">Aléatoire</option></select></label>
-    <label>Changement de preset (s) <input type="number" id="milkInt" min="3" max="600"></label>
-    <div class="btns"><button id="nextPreset">Preset suivant</button></div>
-    <p class="hint" id="presetName"></p>
-  </section>
-
-  <section>
-    <h2>Son et image</h2>
-    <label>Sensibilité micro <input type="range" id="gain" min="0.5" max="8" step="0.1"><output id="gainV"></output></label>
-    <div class="meter" aria-label="Niveaux basses, médiums, aigus"><i id="mB"></i><i id="mM"></i><i id="mT"></i></div>
-    <p class="hint" id="meterTxt">Basses — · Médiums — · Aigus —</p>
-    <div class="btns"><button id="calBtn">Calibrer (2 s, laisse la musique jouer)</button></div>
-    <label>Caméra <select id="facing"><option value="user">Avant (selfie)</option><option value="environment">Arrière</option></select></label>
-    <label>Qualité de rendu <select id="quality"><option value="0.75">Économe</option><option value="1">Normale</option><option value="1.5">Haute</option></select></label>
-    <label class="chk"><input type="checkbox" id="hudChk"> Afficher fps et beat</label>
-    <label class="chk"><input type="checkbox" id="strobeChk"> Flash blanc au beat (en plus de l'effet)</label>
-    <p class="hint">Peut déclencher une crise chez les personnes photosensibles à l'épilepsie.</p>
-    <div class="btns"><button id="resetBtn">Réinitialiser la configuration</button></div>
-  </section>
+  <div class="tab" data-tab="set" hidden>
+    <section>
+      <h2>Micro</h2>
+      <label>Sensibilité <input type="range" id="gain" min="0.5" max="8" step="0.1"><output id="gainV"></output></label>
+      <div class="meter" aria-label="Niveaux basses, médiums, aigus"><i id="mB"></i><i id="mM"></i><i id="mT"></i></div>
+      <p class="hint" id="meterTxt">Basses — · Médiums — · Aigus —</p>
+      <div class="btns"><button id="calBtn">Calibrer (2 s, laisse la musique jouer)</button></div>
+    </section>
+    <section>
+      <h2>Image</h2>
+      <label>Caméra <select id="facing"><option value="user">Avant (selfie)</option><option value="environment">Arrière</option></select></label>
+      <label>Qualité de rendu <select id="quality"><option value="0.6">Économe</option><option value="0.8">Normale</option><option value="1">Haute</option><option value="1.4">Très haute</option></select></label>
+      <label class="chk"><input type="checkbox" id="hudChk"> Afficher BPM, section et fps en bas de l'écran</label>
+    </section>
+    <section>
+      <h2>Débogage</h2>
+      <label class="chk"><input type="checkbox" id="dbgChk"> Afficher les mesures par module (en haut à gauche)</label>
+      <p class="hint" id="recInfo"></p>
+      <div class="btns"><button id="shareBtn">Partager le rapport</button><button id="benchBtn">Banc d'essai (≈ 3 min)</button></div>
+      <div id="benchOut"></div>
+      <div class="btns"><button id="resetBtn">Réinitialiser la configuration</button></div>
+      <p class="hint" id="verInfo"></p>
+    </section>
+  </div>
 </aside>
 
 <div id="log"></div>
@@ -140,73 +223,364 @@
 <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js"></script>
 
 <script type="module">
+const APP_VERSION = '0.6 — 26/09/2026';
 const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const nowS = () => performance.now() / 1000;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+/* ---------- Journal (rapport de débogage) ---------- */
+const REC = { t0: nowS(), samples: [], events: [], bench: null };
+function logEvent(type, detail){
+  REC.events.push(Object.assign({ t: +(nowS() - REC.t0).toFixed(2), type }, detail || {}));
+  if (REC.events.length > 20000) REC.events.shift();
+}
 const logBox = $('#log');
-function err(msg){ const d=document.createElement('div'); d.textContent=msg; logBox.appendChild(d); setTimeout(()=>d.remove(),8000); console.error(msg); }
+function err(msg){
+  const d = document.createElement('div'); d.textContent = msg; logBox.appendChild(d); setTimeout(() => d.remove(), 8000);
+  console.error(msg); logEvent('erreur', { msg: String(msg).slice(0, 300) });
+}
 window.addEventListener('error', e => err('Erreur : ' + e.message));
 window.addEventListener('unhandledrejection', e => err('Erreur : ' + (e.reason?.message || e.reason)));
 
+/* EAR-BEGIN — « l'oreille » : analyse musicale temps réel, sans DOM (testable hors navigateur) */
+const PROFILES = {
+  club: { label:'Club 4/4 : house, techno, trance', bpmMin:118, bpmMax:152, kickLo:40, kickHi:125 },
+  hard: { label:'Hard : hard trance, hard techno',   bpmMin:136, bpmMax:170, kickLo:40, kickHi:130 },
+  dnb:  { label:"Drum'n'bass (expérimental)",        bpmMin:160, bpmMax:186, kickLo:30, kickHi:110 },
+};
+const EAR_CFG = {
+  kOnK: 1.6,        // seuil d'onset kick : moyenne + k × écart-type
+  kOnMin: 2.0,      // hausse minimale (dB moyens sur la bande kick)
+  strongDb: 6,      // un kick « fort » (retour du drop) dépasse la référence de groove − strongDb dB
+  presentDb: 8,     // présence : niveau lissé > référence − presentDb (pendant ~1 temps)
+  absentDb: 12,     // absence : niveau lissé < référence − absentDb (pendant ~1 temps)
+  tempoConf: 0.20,  // confiance minimale pour accepter une estimation de tempo
+  buildC: 18,       // montée : pente du centroïde (Hz/s)
+  buildH: 0.30,     // montée : pente des aigus (dB/s)
+  buildRise: 250,   // montée : hausse minimale du centroïde sur 8 s (Hz)
+  buildBars: 3,     // montée : durée minimale (mesures) avant de déclarer BUILD
+  gapDrop: 9,       // trou : chute d'énergie rapide (dB) pendant une montée sans kick
+  envKick: 1, envFlux: 3,    // poids de l'enveloppe d'onsets pour le tempo
+};
+function createEar(profileId){
+  const E = {
+    profile: profileId || 'club',
+    kickDb:-120, kickSlow:-120, fullFast:-120, fullSlow:-120, hiDb:-120, hiSlow:-120, centroid:0, cSmooth:0,
+    ref:-60, present:false, lastStrong:0, lastKick:0,
+    bpm:0, conf:0, locked:false, T:0.46, cand:0, candN:0,
+    beat:0, lastBeatT:0, nextBeatT:0, barAnchor:0,
+    state:'INTRO', since:0, absentSince:0, buildSince:0, buildingSince:0, building:false, fromBreak:false,
+    stateLog:[], breakStart:0, cutActive:false, cSlope:0, hSlope:0, buildP:0, cAtBuild:0,
+    events:[], bands:{sub:0,low:0,mid:0,hi:0}, spec:null,
+    _prev:null, _tLast:0, _env:[], _envT:[], _kOn:[], _refHist:[], _tRef:0, _tRefCalc:0, _tTempo:0, _tHist:0,
+    _cHist:[], _hHist:[], _strong:[], _warm:0, _maxHist:[],
+  };
+  const P = () => PROFILES[E.profile] || PROFILES.club;
+  const ema = (a, b, dt, tau) => a + (b - a) * (1 - Math.exp(-dt / tau));
+  const bar = () => 4 * E.T;
+  function setState(s, now, info){
+    const from = E.state; if (from === s) return;
+    E.state = s; E.since = now; if (s === 'GAP'){ E._gapOnsets = 0; E._hadGap = true; }
+    if (s === 'DROP' || s === 'BREAK' || s === 'GROOVE'){ E._cHist.length = 0; E._hHist.length = 0; E.building = false; }
+    E.stateLog.push({ t:now, s });
+    E.events.push(Object.assign({ type:'section', t:now, from, to:s }, info || {}));
+  }
+  function anchor(tk){            // le kick tk devient le temps 1 d'une nouvelle phrase
+    E.lastBeatT = tk; E.nextBeatT = tk + E.T; E.beat += 1; E.barAnchor = E.beat;
+    E.events.push({ type:'beat', t:tk, beat:E.beat, inBar:0, bar:0, anchor:true });
+  }
+  function slope(arr){            // régression linéaire [t, v] → pente par seconde
+    const n = arr.length; if (n < 6) return 0;
+    let st=0, sv=0, stt=0, stv=0;
+    for (const [t, v] of arr){ st+=t; sv+=v; stt+=t*t; stv+=t*v; }
+    const d = n*stt - st*st; return d ? (n*stv - st*sv) / d : 0;
+  }
+  function estimateTempo(now){
+    const fs = 100, N = 700, t0 = now - (N - 1) / fs;
+    const T = E._envT, V = E._env; if (!T.length || T[0] > now - 5) return;
+    const x = new Float32Array(N); let j = 0;
+    for (let i = 0; i < N; i++){
+      const t = t0 + i / fs;
+      while (j < T.length - 2 && T[j + 1] < t) j++;
+      const ta = T[j], tb = T[j + 1] ?? ta;
+      x[i] = (t <= ta || tb === ta) ? V[j] : V[j] + (V[j + 1] - V[j]) * (t - ta) / (tb - ta);
+    }
+    let m = 0; for (let i = 0; i < N; i++) m += x[i]; m /= N;
+    for (let i = 0; i < N; i++) x[i] -= m;
+    const p = P(), maxLag = Math.ceil(4 * 60 * fs / p.bpmMin) + 2, ac = new Float32Array(maxLag + 1);
+    for (let l = 0; l <= maxLag; l++){ let s = 0; for (let n = l; n < N; n++) s += x[n] * x[n - l]; ac[l] = s; }
+    if (ac[0] <= 0) return;
+    for (let l = maxLag; l >= 0; l--) ac[l] /= ac[0];
+    const acI = L => { const i = Math.floor(L), f = L - i; return i + 1 > maxLag ? 0 : ac[i] * (1 - f) + ac[i + 1] * f; };
+    let best = -1, bestB = 0; const scores = [];
+    for (let b = p.bpmMin; b <= p.bpmMax; b += 0.25){
+      const L = 60 * fs / b, s = acI(L) + 0.6 * acI(2 * L) + 0.4 * acI(4 * L);
+      scores.push(s); if (s > best){ best = s; bestB = b; }
+    }
+    scores.sort((a, b) => a - b);
+    E.conf = best - scores[scores.length >> 1];
+    if (E.conf < EAR_CFG.tempoConf || !E.present) return;
+    if (!E.bpm){
+      if (Math.abs(bestB - E.cand) < 1.5){ if (++E.candN >= 2){ E.bpm = bestB; E.locked = true; } }
+      else { E.cand = bestB; E.candN = 1; }
+    } else if (Math.abs(bestB - E.bpm) < 2.5){
+      E.bpm = E.bpm * 0.8 + bestB * 0.2; E.locked = true; E.candN = 0;
+    } else {
+      if (Math.abs(bestB - E.cand) < 1.5){ if (++E.candN >= 3){ E.bpm = bestB; E.candN = 0; } }
+      else { E.cand = bestB; E.candN = 1; }
+    }
+    if (E.bpm){ E.T = 60 / E.bpm; E.events.push({ type:'tempo', t:now, bpm:E.bpm }); }
+  }
+
+  /* db : Float32Array des niveaux dB (sortie AnalyserNode, lissage 0), now : secondes */
+  E.process = function(db, now, sr, fftSize){
+    const hz = sr / fftSize, p = P();
+    const dt = E._tLast ? Math.min(0.1, Math.max(0.001, now - E._tLast)) : 0.01; E._tLast = now;
+    if (!E._warm) E._warm = now;
+    const nb = db.length, prev = E._prev || (E._prev = new Float32Array(nb).fill(-110));
+    const k0 = Math.max(1, Math.ceil(p.kickLo / hz)), k1 = Math.max(k0, Math.floor(p.kickHi / hz));
+    const top = Math.min(nb - 1, Math.floor(10000 / hz)), fluxTop = Math.min(nb - 1, Math.floor(8000 / hz));
+    let kLin = 0, kOn = 0, fLin = 0, flux = 0, hLin = 0, hN = 0, cNum = 0, cDen = 0;
+    const bs = { sub:[0,0], low:[0,0], mid:[0,0], hi:[0,0] };
+    for (let i = 1; i <= top; i++){
+      const v = db[i] > -110 ? (db[i] < 0 ? db[i] : 0) : -110, m = Math.pow(10, v / 20), f = i * hz;
+      const d = v - prev[i];
+      if (i >= k0 && i <= k1){ kLin += m; if (d > 0) kOn += d; }
+      if (i <= fluxTop && d > 0) flux += d;
+      fLin += m;
+      if (f >= 2000 && f <= 8000){ hLin += m; hN++; }
+      if (f >= 100){ cNum += f * m; cDen += m; }
+      const b = f < 150 ? bs.sub : f < 600 ? bs.low : f < 2500 ? bs.mid : bs.hi; b[0] += m; b[1]++;
+      prev[i] = v;
+    }
+    const nk = k1 - k0 + 1;
+    E.kickDb = 20 * Math.log10(kLin / nk + 1e-9); kOn /= nk; flux /= fluxTop;
+    const fullDb = 20 * Math.log10(fLin / top + 1e-9);
+    E.hiDb = 20 * Math.log10(hLin / Math.max(1, hN) + 1e-9);
+    E.centroid = cDen > 0 ? cNum / cDen : 0;
+    for (const k in bs) E.bands[k] = 20 * Math.log10(bs[k][0] / Math.max(1, bs[k][1]) + 1e-9);
+    E.kickSlow = E.kickSlow < -119 ? E.kickDb : ema(E.kickSlow, E.kickDb, dt, 0.35);
+    E.fullFast = E.fullFast < -119 ? fullDb : ema(E.fullFast, fullDb, dt, 0.12);
+    E.fullSlow = E.fullSlow < -119 ? fullDb : ema(E.fullSlow, fullDb, dt, 3.0);
+    E.hiSlow = E.hiSlow < -119 ? E.hiDb : ema(E.hiSlow, E.hiDb, dt, 0.5);
+    E.cSmooth = E.cSmooth ? ema(E.cSmooth, E.centroid, dt, 0.5) : E.centroid;
+
+    // enveloppe d'onsets pour le tempo
+    E._envT.push(now); E._env.push(EAR_CFG.envKick * kOn + EAR_CFG.envFlux * flux);
+    while (E._envT.length && E._envT[0] < now - 9){ E._envT.shift(); E._env.shift(); }
+
+    // détection des kicks (seuil adaptatif sur 1,5 s)
+    E._kOn.push([now, kOn]); while (E._kOn[0][0] < now - 1.5) E._kOn.shift();
+    let mu = 0, sd = 0; for (const [, v] of E._kOn) mu += v; mu /= E._kOn.length;
+    for (const [, v] of E._kOn) sd += (v - mu) * (v - mu); sd = Math.sqrt(sd / E._kOn.length);
+    const refr = E.bpm ? 0.45 * E.T : 0.2;
+    if (kOn > mu + EAR_CFG.kOnK * sd && kOn > EAR_CFG.kOnMin && now - E.lastKick > refr && E.kickDb > E.ref - 18){
+      E.lastKick = now;
+      if (!E.present && !E._firstOnset && E.kickDb > E.ref - EAR_CFG.presentDb) E._firstOnset = now;
+      const strong = E.kickDb > E.ref - EAR_CFG.strongDb;
+      E.events.push({ type:'kick', t:now, strong });
+      if (strong){ E.lastStrong = now; E._strong.push(now); E._lastStrongDb = E.kickDb; }
+      // saut du kick : pic instantané vs niveau moyen des 2 dernières mesures → drop pendant une montée ou un trou
+      let pm = 0, pn = 0; for (const [t, v] of E._maxHist) if (t > now - 8 * E.T && t < now - 0.3){ pm += v; pn++; }
+      E._jump = pn ? E.kickDb - pm / pn : 0;
+      if ((E.state === 'BUILD' || E.state === 'GAP') && E.kickDb > E.ref - 4 && E._jump > 10){
+        drop(now, E.state === 'GAP' ? (E.gapBuild || 0) : (now - E.buildSince) / (4 * E.T), E.state === 'GAP', now);
+      }
+      // un « trou » où le kick continue à mi-puissance n'en est pas un : on retourne en montée
+      else if (E.state === 'GAP' && E.kickDb > E.ref - 10 && E.kickDb <= E.ref - 4 && ++E._gapOnsets >= 3){ E.fromBreak = false; setState('BUILD', now); }
+      if (E.bpm){                   // boucle à verrouillage de phase : recale la grille des temps
+        let e = now - E.lastBeatT; if (e > E.T / 2) e -= E.T;
+        if (Math.abs(e) < 0.3 * E.T) E.nextBeatT += 0.3 * e;
+      }
+    }
+    while (E._strong.length && E._strong[0] < now - 4) E._strong.shift();
+
+    // référence de groove : 75e centile du niveau kick quand le kick est présent
+    if (now - E._tRef > 0.1){
+      E._tRef = now;
+      E._maxHist.push([now, E.kickSlow]); while (E._maxHist[0][0] < now - 10) E._maxHist.shift();
+      if (E.present && (E.state === 'GROOVE' || E.state === 'DROP' || E.state === 'INTRO')){ E._refHist.push(E.kickSlow); if (E._refHist.length > 300) E._refHist.shift(); }
+      if (now - E._tRefCalc > 1){
+        E._tRefCalc = now;
+        if (E._refHist.length > 20){ const s = E._refHist.slice().sort((a, b) => a - b); E.ref = s[Math.floor(s.length * 0.75)]; }
+        else { let mx = -120; for (const [, v] of E._maxHist) mx = Math.max(mx, v); E.ref = mx - 2; }
+      }
+    }
+    // présence du kick : niveau lissé vs référence de groove, avec hystérésis et anti-rebond d'environ un temps
+    const wasPresent = E.present, deb = 0.8 * E.T;
+    if (!E.present){
+      const onsets = E.lastKick > now - 1.2;
+      if (E.kickSlow > E.ref - EAR_CFG.presentDb && onsets){
+        if (!E._pCand) E._pCand = E._firstOnset || now;
+        if (now - E._pCand >= deb){ E.present = true; E.presentSince = E._pCand; }
+      } else E._pCand = 0;
+    } else {
+      if (E.kickSlow < E.ref - EAR_CFG.absentDb){
+        if (!E._aCand) E._aCand = now;
+        if (now - E._aCand >= deb){ E.present = false; E.absentSince = Math.min(E._aCand, E.lastKick + 0.5 * E.T); E._firstOnset = 0; }
+      } else E._aCand = 0;
+    }
+
+    // montée : pentes du centroïde et des aigus sur 8 s
+    if (now - E._tHist > 0.25){
+      E._tHist = now;
+      E._cHist.push([now, E.cSmooth]); E._hHist.push([now, E.hiSlow]);
+      while (E._cHist[0][0] < now - 8) E._cHist.shift();
+      while (E._hHist[0][0] < now - 8) E._hHist.shift();
+      E.cSlope = slope(E._cHist); E.hSlope = slope(E._hHist);
+      let cMin = 1e9; for (const [, v] of E._cHist) cMin = Math.min(cMin, v);
+      const span = E._cHist.length ? E._cHist[E._cHist.length - 1][0] - E._cHist[0][0] : 0;
+      const b = span > 5 && ((E.cSlope > EAR_CFG.buildC && E.cSmooth - cMin > EAR_CFG.buildRise) || E.hSlope > EAR_CFG.buildH);
+      if (b && !E.building) E.buildingSince = now;
+      E.building = b;
+    }
+    const buildDur = E.building ? now - E.buildingSince : 0;
+
+    // horloge des temps
+    if (!E.nextBeatT) { E.nextBeatT = now + E.T; E.lastBeatT = now; }
+    if (now - E.nextBeatT > 2 * E.T) E.nextBeatT = now + E.T;
+    while (now >= E.nextBeatT){
+      E.beat++; E.lastBeatT = E.nextBeatT; E.nextBeatT += E.T;
+      const rel = E.beat - E.barAnchor, inBar = ((rel % 4) + 4) % 4, barN = Math.floor(rel / 4);
+      E.events.push({ type:'beat', t:E.lastBeatT, beat:E.beat, inBar, bar:barN });
+    }
+    if (now - E._tTempo > 0.5){ E._tTempo = now; estimateTempo(now); }
+
+    // machine à états des sections
+    const B = bar(), absentBars = E.present ? 0 : (now - E.absentSince) / B;
+    const s = E.state;
+    if (s === 'INTRO' || s === 'GROOVE' || s === 'DROP'){
+      if (s === 'INTRO' && E.present) setState('GROOVE', now);
+      if (s === 'INTRO' && !E.present && now - E._warm > 8) { E.breakStart = E._warm; setState('BREAK', now); }
+      if (s === 'DROP' && (now - E.since) > 32 * B) setState('GROOVE', now);
+      if (E.present && buildDur > EAR_CFG.buildBars * B && s !== 'INTRO' && !(s === 'DROP' && now - E.since < 8 * B)){ E.fromBreak = false; E.buildSince = Math.min(now, E.buildingSince || now); E.cAtBuild = E.cSmooth; E._hadGap = false; setState('BUILD', now); }
+      else if (!E.present && absentBars >= 4){ E.breakStart = E.absentSince; setState('BREAK', now); E.cutActive = false; }
+      else if (!E.present && absentBars > 0.2) E.cutActive = true;
+      else if (E.present && !wasPresent && E.cutActive){
+        E.cutActive = false; anchor(E.presentSince || now);
+        E.events.push({ type:'phrase', t:now, reason:'fill' });
+        E._cHist.length = 0; E._hHist.length = 0; E.building = false;
+      }
+    } else if (s === 'BUILD'){
+      E.buildP = Math.min(1, Math.max((now - E.buildSince) / (16 * B), (E.cSmooth - E.cAtBuild) / 1000));
+      if (!E.fromBreak && !E.present && (now - E.absentSince) > 1.5 * E.T){ E.gapBuild = (now - E.buildSince) / B; setState('GAP', now); }
+      else if (E.fromBreak && E.fullFast < E.fullSlow - EAR_CFG.gapDrop){ E.gapBuild = (now - E.buildSince) / B; setState('GAP', now); }
+      else if (E.fromBreak && E.present && now - E.presentSince >= E.T && E.kickSlow > E.ref - 4) drop(now, (now - E.buildSince) / B, false);
+      else if (E.fromBreak && E.present && now - E.presentSince >= B) E.fromBreak = false;   // kick filtré revenu dans la montée
+      else if (now - Math.max(E._lastBuildT || 0, E.since) > (E.fromBreak ? 8 : 6) * B) setState(E.fromBreak ? 'BREAK' : 'GROOVE', now);
+      if (E.building) E._lastBuildT = now;
+    } else if (s === 'BREAK'){
+      if (buildDur > EAR_CFG.buildBars * B){ E.fromBreak = true; E.buildSince = Math.min(now, E.buildingSince || now); E.cAtBuild = E.cSmooth; E._hadGap = false; setState('BUILD', now); }
+      else if (solidReturn(now, B)) drop(now, 0, false);
+    } else if (s === 'GAP'){
+      if (E.lastStrong > E.since + 0.1 && E._lastStrongDb > E.ref - 4 && E._gapOnsets === 0) drop(now, E.gapBuild || 0, true, E.lastStrong);
+      else if (now - E.since > 4 * B){ E.breakStart = E.since; setState('BREAK', now); }
+    }
+    E.buildP = E.state === 'BUILD' ? E.buildP : (E.state === 'GAP' ? 1 : 0);
+  };
+  // retour du kick après un break : soutenu 1 mesure, ou kick à pleine puissance
+  function solidReturn(now, B){
+    return E.present && (now - E.presentSince >= 2 * B || (now - E.presentSince >= E.T && E.kickSlow > E.ref - 4));
+  }
+  function drop(now, buildBars, viaGap, tk){
+    const breakBars = E.breakStart ? Math.max(0, (E.since - E.breakStart) / bar()) : 0;
+    const score = buildBars + 0.5 * Math.min(breakBars, 32) + (viaGap ? 4 : 0);
+    const big = buildBars >= 4 && (viaGap || E._hadGap);
+    E.breakStart = 0; E.cutActive = false; E._hadGap = false; E.present = true; E.presentSince = tk || E.presentSince || now; E._aCand = 0;
+    setState('DROP', now, { buildBars, breakBars, viaGap, score, big });
+    anchor(tk || E.presentSince || now);
+  }
+  E.anchor = anchor;
+  E.tap = function(now){                 // tap tempo manuel
+    E._taps = (E._taps || []).filter(t => now - t < 3); E._taps.push(now);
+    if (E._taps.length >= 3){
+      const iv = []; for (let i = 1; i < E._taps.length; i++) iv.push(E._taps[i] - E._taps[i - 1]);
+      const T = iv.reduce((a, b) => a + b, 0) / iv.length;
+      if (T > 0.25 && T < 1.2){ E.T = T; E.bpm = 60 / T; E.locked = true; E.cand = 0; E.candN = 0; anchor(now); }
+    }
+  };
+  E.info = function(now){
+    const rel = E.beat - E.barAnchor;
+    return { bpm:E.bpm, conf:E.conf, state:E.state, present:E.present, inBar:((rel % 4) + 4) % 4, bar:Math.floor(rel / 4),
+      beatPh:Math.min(1, (now - E.lastBeatT) / E.T), buildP:E.buildP, ref:E.ref, kick:E.kickSlow, cSlope:E.cSlope, hSlope:E.hSlope };
+  };
+  return E;
+}
+/* EAR-END */
+
+
 /* ---------- Catalogue des effets ---------- */
+// humeur : l = calme (break), m = moyen (groove), h = intense (drop)
 const EFFECTS = [
-  { id:'milk',     name:'MilkDrop (presets Winamp)',  milk:true,  cam:false, seg:false, dur:40 },
-  { id:'spectrum', name:'Spectre circulaire',         milk:false, cam:false, seg:false, dur:20 },
-  { id:'cloud',    name:'Nuage de points caméra',     milk:false, cam:true,  seg:true,  dur:30 },
-  { id:'neon',     name:'Silhouettes néon',           milk:false, cam:true,  seg:true,  dur:30 },
-  { id:'thermal',  name:'Caméra thermique',           milk:false, cam:true,  seg:false, dur:20 },
-  { id:'kaleido',  name:'Kaléidoscope caméra',        milk:false, cam:true,  seg:false, dur:20 },
-  { id:'mirror',   name:'Symétrie miroir',            milk:false, cam:true,  seg:false, dur:25 },
-  { id:'feedback', name:'Trainées (feedback)',        milk:false, cam:true,  seg:true,  dur:30 },
-  { id:'glitch',   name:'Glitch RGB',                 milk:false, cam:true,  seg:false, dur:20 },
+  { id:'milk',     name:'MilkDrop seul',              cam:false, seg:false, dur:40, mood:'lmh' },
+  { id:'lasers',   name:'Lasers virtuels',            cam:false, seg:false, dur:30, mood:'lmh' },
+  { id:'neon3d',   name:'Néon 3D',                    cam:false, seg:false, dur:30, mood:'lmh' },
+  { id:'spectrum', name:'Spectre (radial / égaliseur)', cam:false, seg:false, dur:20, mood:'m' },
+  { id:'cloud',    name:'Nuage de points caméra',     cam:true,  seg:true,  dur:30, mood:'lmh' },
+  { id:'neon',     name:'Silhouettes néon',           cam:true,  seg:true,  dur:30, mood:'lm' },
+  { id:'thermal',  name:'Caméra thermique',           cam:true,  seg:false, dur:20, mood:'m' },
+  { id:'kaleido',  name:'Kaléidoscope caméra',        cam:true,  seg:false, dur:20, mood:'mh' },
+  { id:'mirror',   name:'Symétrie miroir',            cam:true,  seg:false, dur:25, mood:'lm' },
+  { id:'feedback', name:'Trainées (feedback)',        cam:true,  seg:true,  dur:30, mood:'l' },
+  { id:'glitch',   name:'Glitch RGB',                 cam:true,  seg:false, dur:20, mood:'h' },
 ];
 const EFX = Object.fromEntries(EFFECTS.map(e => [e.id, e]));
+const MOODS = { lmh:'Toujours', l:'Calme', m:'Moyen', h:'Intense', lm:'Calme + moyen', mh:'Moyen + intense' };
 
 /* ---------- Configuration (sauvegardée dans le navigateur) ---------- */
-const KEY = 'vjlive.cfg.v1';
-const DEFAULT = { mode:'auto', gain:2, facing:'user', quality:1, hud:true, milkInterval:20, milkPreset:'', strobe:false, milkBg:true,
-  playlist: EFFECTS.map(e => ({ id:e.id, on:true, dur:e.dur })) };
+const KEY = 'vjlive.cfg.v2';
+const DEFAULT = { mode:'auto', gain:2, facing:'user', quality:0.8, hud:true, debug:false,
+  milkBg:true, milkInterval:25, milkPreset:'', presetMood:{}, strobe:false, co2Auto:true, co2Dur:45, co2Cooldown:10,
+  profile:'club', pace:'normal', symGen:'auto',
+  effects: EFFECTS.map(e => ({ id:e.id, on:true, dur:e.dur, mood:e.mood })) };
 function loadCfg(){
   let c = null; try { c = JSON.parse(localStorage.getItem(KEY)); } catch {}
+  if (!c){ // reprise de la v1
+    let old = null; try { old = JSON.parse(localStorage.getItem('vjlive.cfg.v1')); } catch {}
+    if (old){ c = {}; for (const k of ['gain','facing','hud','milkBg','strobe','milkInterval']) if (k in old) c[k] = old[k]; }
+  }
   c = Object.assign(structuredClone(DEFAULT), c || {});
-  c.playlist = (c.playlist || []).filter(p => EFX[p.id]);
-  EFFECTS.forEach(e => { if (!c.playlist.find(p => p.id === e.id)) c.playlist.push({ id:e.id, on:true, dur:e.dur }); });
+  c.effects = (c.effects || []).filter(p => EFX[p.id]);
+  EFFECTS.forEach(e => { if (!c.effects.find(p => p.id === e.id)) c.effects.push({ id:e.id, on:true, dur:e.dur, mood:e.mood }); });
+  if (!PROFILES[c.profile]) c.profile = 'club';
   return c;
 }
 let cfg = loadCfg();
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch {} }
 
-/* ---------- Audio ---------- */
-let actx, gainNode, analyser, freq, wave;
-const A = { bass:0, mid:0, treb:0, vol:0, beat:0, bassAvg:0.1, lastBeat:0 };
+/* ---------- Mesure des performances par module ---------- */
+const PERF = { acc:{}, max:{}, frames:0, long:0, dtMax:0, t0:nowS(), last:{}, fps:0 };
+function pAdd(k, ms){ PERF.acc[k] = (PERF.acc[k] || 0) + ms; PERF.max[k] = Math.max(PERF.max[k] || 0, ms); }
+const MODS = [['audio','Oreille'],['milk','MilkDrop'],['cam','Caméra'],['seg','IA'],['fx','Effet'],['ovl','Surcouches'],['total','Total CPU']];
+
+/* ---------- Audio + oreille ---------- */
+let actx, gainNode, analyser, dbBuf, ear = createEar(cfg.profile), earTimer = 0;
+const A = { bass:0, mid:0, treb:0 };
 function buildAudioGraph(){
   actx = new (window.AudioContext || window.webkitAudioContext)();
   gainNode = actx.createGain(); gainNode.gain.value = cfg.gain;
-  analyser = actx.createAnalyser(); analyser.fftSize = 1024; analyser.smoothingTimeConstant = 0.5;
+  analyser = actx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0;
   gainNode.connect(analyser);   // pas de sortie haut-parleur (évite le larsen)
-  freq = new Uint8Array(analyser.frequencyBinCount);
-  wave = new Uint8Array(analyser.fftSize);
+  dbBuf = new Float32Array(analyser.frequencyBinCount);
 }
-function updateAudio(now){
-  if (!analyser) return;
-  analyser.getByteFrequencyData(freq);
-  analyser.getByteTimeDomainData(wave);
-  const hz = actx.sampleRate / analyser.fftSize;
-  const band = (lo, hi) => { let s=0, n=0; const a=Math.max(1,Math.floor(lo/hz)), b=Math.min(freq.length-1,Math.ceil(hi/hz));
-    for (let i=a;i<=b;i++){ s+=freq[i]; n++; } return n ? s/n/255 : 0; };
-  const b = band(20,150), m = band(150,2000), t = band(2000,10000);
-  A.bass = A.bass*0.55 + b*0.45; A.mid = A.mid*0.7 + m*0.3; A.treb = A.treb*0.7 + t*0.3;
-  A.vol = (A.bass + A.mid + A.treb) / 3;
-  A.bassAvg = A.bassAvg*0.985 + b*0.015;
-  if (b > A.bassAvg*1.3 && b > 0.2 && now - A.lastBeat > 240){ A.lastBeat = now; A.beat = 1; }
-  A.beat *= 0.88;
+function earTick(){
+  if (!appStarted || document.hidden || !analyser) return;
+  const t = performance.now();
+  analyser.getFloatFrequencyData(dbBuf);
+  ear.process(dbBuf, t / 1000, actx.sampleRate, analyser.fftSize);
+  const b = ear.bands;
+  A.bass = clamp((b.sub + 50) / 35, 0, 1); A.mid = clamp((b.mid + 65) / 35, 0, 1); A.treb = clamp((b.hi + 80) / 35, 0, 1);
+  pAdd('audio', performance.now() - t); PERF.audioN = (PERF.audioN || 0) + 1;
 }
 
-/* ---------- Caméra ---------- */
+/* ---------- Caméra + micro (libérés en arrière-plan, repris au retour) ---------- */
 const video = $('#cam');
-let media = null, micSrc = null, mediaStarting = false, appStarted = false;
+let media = null, micSrc = null, mediaStarting = false, appStarted = false, camOK = false;
 function stopMedia(){
   if (media){ media.getTracks().forEach(t => { try { t.stop(); } catch {} }); media = null; }
   if (micSrc){ try { micSrc.disconnect(); } catch {} micSrc = null; }
-  video.srcObject = null;
+  video.srcObject = null; camOK = false;
 }
 function mediaAlive(){ return !!media && media.getTracks().every(t => t.readyState === 'live'); }
 async function openMedia(){
@@ -222,6 +596,7 @@ async function openMedia(){
     micSrc = actx.createMediaStreamSource(s); micSrc.connect(gainNode);
     const vt = s.getVideoTracks()[0];
     if (vt){
+      camOK = true;
       video.srcObject = s; video.play().catch(() => {});      // pas d'await : ne bloque jamais le démarrage
       vt.addEventListener('ended', () => { if (appStarted && !document.hidden && media === s) openMedia(); });
     }
@@ -235,8 +610,8 @@ function resumeApp(){
 }
 document.addEventListener('visibilitychange', () => {
   if (!appStarted) return;
-  if (document.hidden){ stopMedia(); actx.suspend().catch(() => {}); }
-  else resumeApp();
+  if (document.hidden){ stopMedia(); actx.suspend().catch(() => {}); logEvent('arriere-plan'); }
+  else { resumeApp(); logEvent('retour'); }
 });
 addEventListener('pageshow', resumeApp);
 addEventListener('focus', resumeApp);
@@ -246,48 +621,59 @@ const milkCanvas = $('#milk');
 const BC = window.butterchurn?.default || window.butterchurn;
 const BP = window.butterchurnPresets?.default || window.butterchurnPresets;
 const presets = BP ? BP.getPresets() : {};
-const presetNames = Object.keys(presets).sort((a,b)=>a.localeCompare(b));
+const presetNames = Object.keys(presets).sort((a, b) => a.localeCompare(b));
 let viz = null, lastPreset = 0, curPreset = '';
+const MILK_SCALE = 0.75;           // MilkDrop rendu un peu plus petit que l'écran : flou naturel, beaucoup moins coûteux
 function initMilk(){
   if (!BC) { err('Butterchurn non chargé (vérifie la connexion)'); return; }
   viz = BC.createVisualizer(actx, milkCanvas, { width:milkCanvas.width, height:milkCanvas.height, pixelRatio:1, textureRatio:1 });
   viz.connectAudio(gainNode);
-  loadPreset(cfg.milkPreset || null, 0);
+  loadPreset(cfg.milkPreset || pickPresetName(null), 0);
+}
+function pickPresetName(kind){
+  const pm = cfg.presetMood;
+  let list = kind ? presetNames.filter(n => pm[n] === kind) : [];
+  if (!list.length) list = presetNames.filter(n => pm[n] !== 'off');
+  if (!list.length) list = presetNames;
+  return list[Math.floor(Math.random() * list.length)];
 }
 function loadPreset(name, blend = 2){
   if (!viz || !presetNames.length) return;
-  if (!name) name = presetNames[Math.floor(Math.random()*presetNames.length)];
+  if (!name) name = pickPresetName(null);
   curPreset = name; viz.loadPreset(presets[name], blend); lastPreset = performance.now();
-  $('#presetName').textContent = 'Preset affiché : ' + name;
+  $('#presetName').textContent = 'Preset affiché : ' + name + (cfg.presetMood[name] ? ` (${ {calm:'★ calme', energy:'★ énergique', off:'exclu'}[cfg.presetMood[name]] })` : '');
+  logEvent('preset', { name });
 }
+function milkVisible(){ const e = EFX[curId]; return !!e && (e.id === 'milk' || cfg.milkBg); }
 
-/* ---------- Segmentation des personnes (MediaPipe) ---------- */
+/* ---------- Segmentation des personnes (MediaPipe, limitée à 15 Hz) ---------- */
 const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
 const SEG_MODEL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
-let segmenter = null, segLoading = false, segReady = false, lastVT = -1, maskU8 = null;
+let segmenter = null, segLoading = false, segFailed = false, segReady = false, lastVT = -1, maskU8 = null, lastSegRun = 0, segCount = 0;
 async function ensureSeg(){
-  if (segmenter || segLoading) return; segLoading = true;
+  if (segmenter || segLoading || segFailed) return; segLoading = true;
   try {
     const { FilesetResolver, ImageSegmenter } = await import(MP + '/vision_bundle.mjs');
     const fs = await FilesetResolver.forVisionTasks(MP + '/wasm');
     const opts = d => ({ baseOptions:{ modelAssetPath:SEG_MODEL, delegate:d }, runningMode:'VIDEO', outputCategoryMask:false, outputConfidenceMasks:true });
     try { segmenter = await ImageSegmenter.createFromOptions(fs, opts('GPU')); }
     catch { segmenter = await ImageSegmenter.createFromOptions(fs, opts('CPU')); }
-  } catch (e) { err('Segmentation indisponible : ' + e.message); }
+    logEvent('ia-prete');
+  } catch (e) { segFailed = true; err('Segmentation indisponible : ' + e.message); }
   segLoading = false;
 }
-function runSeg(now){
-  if (!segmenter || video.readyState < 2 || video.currentTime === lastVT) return;
-  lastVT = video.currentTime;
-  segmenter.segmentForVideo(video, now, res => {
+function runSeg(nowMs){
+  if (!segmenter || video.readyState < 2 || video.currentTime === lastVT || nowMs - lastSegRun < 66) return;
+  lastVT = video.currentTime; lastSegRun = nowMs;
+  segmenter.segmentForVideo(video, nowMs, res => {
     const masks = res.confidenceMasks; if (!masks?.length) return;
     const inv = masks.length > 1;                      // modèles multi-classes : index 0 = fond
     const mk = masks[0], f = mk.getAsFloat32Array(), w = mk.width, h = mk.height;
     if (!maskU8 || maskU8.length !== f.length) maskU8 = new Uint8Array(f.length);
-    for (let i=0;i<f.length;i++) maskU8[i] = (inv ? 1-f[i] : f[i]) * 255;
+    for (let i = 0; i < f.length; i++) maskU8[i] = (inv ? 1 - f[i] : f[i]) * 255;
     gl.activeTexture(gl.TEXTURE1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, w, h, 0, gl.RED, gl.UNSIGNED_BYTE, maskU8);
-    segReady = true;
+    segReady = true; segCount++;
   });
 }
 
@@ -299,13 +685,20 @@ if (!gl) err('WebGL2 non disponible sur ce navigateur');
 const COMMON = `
 precision highp float;
 uniform sampler2D uCam; uniform sampler2D uMask; uniform sampler2D uFft;
-uniform vec2 uRes; uniform vec2 uCamFit; uniform float uMirror; uniform float uTime;
-uniform float uBass; uniform float uMid; uniform float uTreb; uniform float uBeat; uniform float uVol;
-uniform float uUseMask; uniform float uTransparent; uniform float uDpr; uniform float uMilkBg;
+uniform vec2 uRes; uniform vec2 uCamFit; uniform float uMirror; uniform float uTime; uniform float uAnim;
+uniform float uBass; uniform float uMid; uniform float uTreb;
+uniform float uKick; uniform float uBurst; uniform float uEnergy; uniform float uBuild;
+uniform float uHue; uniform float uHue2; uniform float uSat; uniform float uMode;
+uniform float uUseMask; uniform float uDpr; uniform float uMilkBg; uniform float uInBar;
 vec2 camUV(vec2 uv){ vec2 c=(uv-0.5)*uCamFit+0.5; if(uMirror>0.5) c.x=1.0-c.x; return vec2(c.x,1.0-c.y); }
 vec3 hsv(float h,float s,float v){ vec3 k=clamp(abs(mod(h*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0,0.0,1.0); return v*mix(vec3(1.0),k,s); }
 float luma(vec3 c){ return dot(c,vec3(0.299,0.587,0.114)); }
 float bgAlpha(vec3 c){ return uMilkBg>0.5 ? clamp(pow(max(luma(c),0.0),0.55)*1.35,0.0,1.0) : 1.0; }
+vec3 pal(float k){ return hsv(uHue+k*uSat*0.35,uSat,1.0); }
+float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
+  return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),u.x),mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),u.x),u.y); }
+float fbm(vec2 p){ float v=0.0, a=0.5; for(int i=0;i<4;i++){ v+=a*noise(p); p=p*2.03+vec2(1.7,9.2); a*=0.5; } return v; }
 `;
 const QUAD_VS = `#version 300 es
 in vec2 p; out vec2 vUv; void main(){ vUv=p*0.5+0.5; gl_Position=vec4(p,0.0,1.0); }`;
@@ -316,39 +709,55 @@ ${body}`;
 
 const SHADERS = {
 spectrum: FS(`
+float specAt(float x){ return texture(uFft,vec2(clamp(x,0.0,1.0),0.25)).r; }
+float peakAt(float x){ return texture(uFft,vec2(clamp(x,0.0,1.0),0.75)).r; }
 void main(){
-  vec2 p=(vUv-0.5)*vec2(uRes.x/uRes.y,1.0);
-  float r=length(p), a=atan(p.y,p.x);
-  float f=abs(a)/3.14159;
-  float v=texture(uFft,vec2(0.02+f*0.6,0.5)).r;
-  v=max(v,0.04+0.03*sin(uTime*1.4+f*7.0));            // légère respiration même sans son
-  float r0=0.17+uBass*0.07;
-  float bar=smoothstep(r0,r0+0.004,r)*(1.0-smoothstep(r0+v*0.38,r0+v*0.38+0.01,r))*step(0.3,fract(f*72.0));
-  vec3 col=hsv(f*0.8+uTime*0.05,0.85,1.0)*bar;
-  col+=hsv(uTime*0.1,0.4,1.0)*exp(-abs(r-r0)*90.0)*(0.4+uBeat*1.5);
-  col+=hsv(uTime*0.03+0.5,0.9,1.0)*exp(-r*4.0)*(0.1+uBeat*0.5);
+  vec3 col=vec3(0.0);
+  if(mod(uMode,2.0)<1.0){                                   // radial
+    vec2 p=(vUv-0.5)*vec2(uRes.x/uRes.y,1.0);
+    float r=length(p), a=atan(p.y,p.x);
+    float f=abs(a)/3.14159;
+    float v=max(specAt(0.03+f*0.85),0.03+0.02*sin(uAnim*1.4+f*7.0));
+    float r0=0.16+uKick*0.05+uBurst*0.1;
+    float bar=smoothstep(r0,r0+0.004,r)*(1.0-smoothstep(r0+v*0.36,r0+v*0.36+0.01,r))*step(0.3,fract(f*64.0));
+    col=pal(f)*bar;
+    col+=hsv(uHue2,0.4*uSat,1.0)*exp(-abs(r-r0)*90.0)*(0.3+uKick*1.5);
+    col+=hsv(uHue+0.5,0.9*uSat,1.0)*exp(-r*4.0)*(0.06+uKick*0.35);
+  } else {                                                  // égaliseur à plat, en miroir (basses au centre)
+    float nb=40.0;
+    float x=abs(vUv.x-0.5)*2.0;
+    float bi=floor(x*nb), bx=fract(x*nb);
+    float fq=0.03+(bi+0.5)/nb*0.9;
+    float v=max(specAt(fq),0.02);
+    float pk=peakAt(fq);
+    float y=abs(vUv.y-0.5)*2.0;
+    float colOn=step(0.12,bx)*step(bx,0.88);
+    float lit=colOn*step(0.22,fract(y*28.0))*step(y,v*0.95);
+    float cap=colOn*(1.0-smoothstep(0.0,0.02,abs(y-pk*0.95-0.02)));
+    col=hsv(uHue+y*0.35*uSat,uSat,1.0)*lit*(0.6+0.4*y+uKick*0.3)+vec3(1.0)*cap*0.9;
+  }
   o=vec4(col,bgAlpha(col));
 }`),
 neon: FS(`
 void main(){
   vec2 cu=camUV(vUv);
   vec3 c=texture(uCam,cu).rgb;
-  float m=smoothstep(0.35,0.65,texture(uMask,cu).r)*uUseMask;
   float l=luma(c);
+  float m=uUseMask>0.5 ? smoothstep(0.35,0.65,texture(uMask,cu).r) : smoothstep(0.3,0.65,l);
   float q=floor(l*4.0)/4.0;
-  vec3 pc=hsv(q*0.45+uTime*0.08+uBeat*0.15,0.9,0.35+q*0.9+uBass*0.5);
+  vec3 pc=hsv(uHue+q*0.45*uSat,0.3+0.6*uSat,0.35+q*0.9+uKick*0.35);
   vec2 px=3.0/vec2(textureSize(uMask,0));
   float e=abs(texture(uMask,cu+vec2(px.x,0.0)).r-texture(uMask,cu-vec2(px.x,0.0)).r)
          +abs(texture(uMask,cu+vec2(0.0,px.y)).r-texture(uMask,cu-vec2(0.0,px.y)).r);
   e=clamp(e*uUseMask*1.5,0.0,1.0);
-  vec3 edge=hsv(uTime*0.2+0.5,0.5,1.0)*e*(1.0+uBeat*2.0);
+  vec3 edge=hsv(uHue2,0.5,1.0)*e*(1.0+uKick*2.0);
   vec3 col=pc*m+edge;
-  if(uTransparent>0.5){ o=vec4(col,clamp(m+e,0.0,1.0)); return; }
-  vec3 bg=c*0.07+hsv(uTime*0.02+0.7,0.8,0.05+uBass*0.12);
+  if(uMilkBg>0.5){ o=vec4(col,clamp(m+e,0.0,1.0)); return; }
+  vec3 bg=c*0.07+hsv(uHue+0.5,0.8,0.05+uBass*0.1);
   o=vec4(col+bg*(1.0-m),1.0);
 }`),
 thermal: FS(`
-vec3 pal(float t){ return 0.5+0.5*cos(6.28318*(t+vec3(0.0,0.33,0.67)+uTime*0.04)); }
+vec3 tpal(float t){ return 0.5+0.5*cos(6.28318*(t+vec3(0.0,0.33,0.67)+uHue)); }
 void main(){
   vec2 cu=camUV(vUv);
   vec3 c=texture(uCam,cu).rgb; float l=luma(c);
@@ -356,37 +765,37 @@ void main(){
   float gx=luma(texture(uCam,cu+vec2(px.x,0.0)).rgb)-luma(texture(uCam,cu-vec2(px.x,0.0)).rgb);
   float gy=luma(texture(uCam,cu+vec2(0.0,px.y)).rgb)-luma(texture(uCam,cu-vec2(0.0,px.y)).rgb);
   float ed=length(vec2(gx,gy))*4.0;
-  vec3 col=pal(l*1.4+uBass*0.6)*(0.5+l);
-  col+=vec3(ed)*(0.3+uBeat*2.5)*hsv(uTime*0.1,0.3,1.0);
+  vec3 col=mix(vec3(l),tpal(l*1.4+uBass*0.4),0.35+0.65*uSat)*(0.5+l);
+  col+=vec3(ed)*(0.25+uKick*2.5*uEnergy)*hsv(uHue2,0.3,1.0);
   o=vec4(col,bgAlpha(col));
 }`),
 kaleido: FS(`
 void main(){
   vec2 p=(vUv-0.5)*vec2(uRes.x/uRes.y,1.0);
   float r=length(p), a=atan(p.y,p.x);
-  float seg=6.0+2.0*floor(mod(uTime/12.0,3.0));       // le nombre de pans change toutes les 12 s
+  float seg=6.0+2.0*mod(uMode,4.0);                        // 6, 8, 10 ou 12 pans : change à chaque mode
   float s=6.28318/seg;
-  a=mod(a+uTime*0.15+uMid*0.5,s); a=abs(a-s*0.5);
-  vec2 q=vec2(cos(a),sin(a))*r*(0.9-uBass*0.35-uBeat*0.1);
+  a=mod(a+uAnim*0.15+uMid*0.3,s); a=abs(a-s*0.5);
+  vec2 q=vec2(cos(a),sin(a))*r*(0.9-uKick*0.12*uEnergy-uBurst*0.35);
   vec3 c=texture(uCam,camUV(q+0.5)).rgb;
-  c=mix(c,hsv(r*1.5+uTime*0.08,0.8,1.0)*luma(c)*1.6,0.55);
-  c*=1.0+uBeat*0.7;
+  c=mix(c,pal(r*1.5)*luma(c)*1.6,0.55);
+  c*=1.0+uKick*0.6*uEnergy;
   o=vec4(c,bgAlpha(c));
 }`),
 mirror: FS(`
 void main(){
   vec2 uv=vUv-0.5;
-  float mode=mod(floor(uTime/9.0),4.0);                // symétrie verticale / horizontale / 4 quadrants / radiale, change toutes les 9 s
+  float mode=mod(uMode,4.0);                                 // verticale / horizontale / 4 quadrants / radiale
   vec2 p=uv;
   if(mode<1.0){ p.x=abs(p.x); }
   else if(mode<2.0){ p.y=abs(p.y); }
   else if(mode<3.0){ p.x=abs(p.x); p.y=abs(p.y); }
   else { float a=abs(mod(atan(p.y,p.x),1.5708)); p=vec2(cos(a),sin(a))*length(p); }
-  p*=1.0-uBass*0.06-uBeat*0.04;
-  p=vec2(p.x*cos(uBeat*0.1)-p.y*sin(uBeat*0.1), p.x*sin(uBeat*0.1)+p.y*cos(uBeat*0.1));
+  p*=1.0-uKick*0.06*uEnergy-uBurst*0.2;
+  float rt=uKick*0.08*uEnergy;
+  p=vec2(p.x*cos(rt)-p.y*sin(rt),p.x*sin(rt)+p.y*cos(rt));
   vec3 c=texture(uCam,camUV(p+0.5)).rgb;
-  vec3 tint=hsv(uTime*0.04+length(uv)*0.6,0.55,1.0);
-  c=mix(c,tint*luma(c)*1.4,0.18+uBeat*0.25);
+  c=mix(c,pal(length(uv))*luma(c)*1.4,0.18+uKick*0.25);
   o=vec4(c,bgAlpha(c));
 }`),
 glitch: FS(`
@@ -394,239 +803,696 @@ float rand(vec2 c){ return fract(sin(dot(c,vec2(12.9898,78.233)))*43758.5453); }
 void main(){
   vec2 uv=vUv;
   float sliceY=floor(uv.y*24.0)/24.0;
-  float jit=(rand(vec2(sliceY,floor(uTime*6.0)))-0.5)*(0.015+uBeat*0.12+uBass*0.04);
+  float jit=(rand(vec2(sliceY,floor(uTime*6.0)))-0.5)*(0.01+uKick*0.12*uEnergy+uBurst*0.2);
   uv.x+=jit;
   vec2 cu=camUV(uv);
-  float off=0.004+uTreb*0.01+uBeat*0.02;
-  float r=texture(uCam,cu+vec2(off,0.0)).r;
-  float g=texture(uCam,cu).g;
-  float b=texture(uCam,cu-vec2(off,0.0)).b;
-  vec3 c=vec3(r,g,b);
+  float off=0.004+uTreb*0.01+uKick*0.02;
+  vec3 c=vec3(texture(uCam,cu+vec2(off,0.0)).r,texture(uCam,cu).g,texture(uCam,cu-vec2(off,0.0)).b);
   float bar=step(0.985,rand(vec2(0.0,floor(uTime*10.0))))*step(fract(uv.y*3.0+uTime*2.0),0.08);
   c=mix(c,1.0-c,bar);
-  c*=0.9+0.3*uBeat;
+  c=mix(c,c*pal(uv.y),0.25*uSat);
+  c*=0.9+0.3*uKick;
   o=vec4(c,bgAlpha(c));
 }`),
 feedback: FS(`
 uniform sampler2D uPrev;
 void main(){
   vec2 c=vUv-0.5;
-  float ang=0.012+uBass*0.03; float sc=1.0-0.008-uBass*0.018-uBeat*0.025;
+  float sgn=mod(uMode,2.0)<1.0 ? 1.0 : -1.0;
+  float ang=sgn*(0.006+uEnergy*0.012+uKick*0.02);
+  float sc=1.0-0.006-uEnergy*0.01-uKick*0.02-uBurst*0.05;
   mat2 rot=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));
   vec3 prev=texture(uPrev,rot*c*sc+0.5).rgb*0.93;
   vec2 cu=camUV(vUv);
   vec3 cam=texture(uCam,cu).rgb;
   float m=texture(uMask,cu).r*uUseMask;
-  vec3 fresh=mix(cam*0.4,hsv(uTime*0.08+luma(cam),0.85,1.0)*(0.3+m*0.9),0.55)*(0.2+uTreb*0.4+uBeat*0.7);
+  vec3 fresh=mix(cam*0.4,pal(luma(cam))*(0.3+m*0.9),0.55)*(0.15+uTreb*0.3+uKick*0.7);
   o=vec4(max(prev,fresh),1.0);
 }`),
-strobe: FS(`
-void main(){ o=vec4(vec3(1.0)*uBeat*uBeat,1.0); }`),
+lasers: FS(`
+uniform float uLMode; uniform float uLCount;
+float beamI(vec2 p,vec2 s,float ang,float w){
+  vec2 d=vec2(cos(ang),sin(ang)); vec2 q=p-s;
+  float along=dot(q,d); if(along<0.0) return 0.0;
+  float perp=abs(q.x*d.y-q.y*d.x);
+  return (exp(-perp/w)+0.25*exp(-perp/(w*6.0)))*exp(-along*0.35);
+}
+void main(){
+  float asp=uRes.x/uRes.y;
+  vec2 p=(vUv-0.5)*vec2(asp,1.0);
+  float fog=0.55+0.65*fbm(p*2.5+vec2(uAnim*0.07,-uAnim*0.05));
+  float w=0.0028*(1.0+uKick*0.6);
+  float bright=0.55+0.45*uEnergy+uKick*0.6;
+  float n=clamp(uLCount,1.0,24.0);
+  float mode=mod(uLMode,6.0);
+  vec3 col=vec3(0.0);
+  if(mode<1.0){                                             // balayage : quelques faisceaux serrés, lents
+    vec2 s=vec2(0.0,-0.55); float c=1.5708+0.55*sin(uAnim*0.5);
+    for(int i=0;i<24;i++){ if(float(i)>=n) break; float k=float(i)/max(n-1.0,1.0)-0.5;
+      col+=pal(0.0)*beamI(p,s,c+k*0.35,w); }
+  } else if(mode<2.0){                                      // éventail
+    vec2 s=vec2(0.0,-0.55); float c=1.5708+0.35*sin(uAnim*0.9);
+    for(int i=0;i<24;i++){ if(float(i)>=n) break; float k=float(i)/max(n-1.0,1.0)-0.5;
+      vec3 bc=mod(float(i),2.0)<1.0 ? hsv(uHue,uSat,1.0) : hsv(uHue2,uSat,1.0);
+      col+=bc*beamI(p,s,c+k*1.9,w); }
+  } else if(mode<3.0){                                      // croisés depuis les deux coins
+    for(int j=0;j<2;j++){ float sd=float(j)*2.0-1.0; vec2 s=vec2(sd*asp*0.48,-0.55);
+      float c=1.5708+sd*(0.35+0.25*sin(uAnim*0.7+float(j)*1.3));
+      for(int i=0;i<12;i++){ if(float(i)>=n*0.5) break; float k=float(i)/max(n*0.5-1.0,1.0)-0.5;
+        col+=hsv(j==0?uHue:uHue2,uSat,1.0)*beamI(p,s,c+k*0.6,w); } }
+  } else if(mode<4.0){                                      // tunnel : anneau + rayons qui tournent
+    float r=length(p), a=atan(p.y,p.x);
+    float R=0.28+0.05*sin(uAnim*0.8)+uKick*0.04;
+    float ring=exp(-abs(r-R)/0.004)*0.9;
+    float spokes=pow(max(0.0,cos((a+uAnim*0.6)*n*0.5)),60.0)*smoothstep(0.0,R,r)*(r>R ? exp(-(r-R)*3.0) : 1.0);
+    col=pal(r)*(ring+spokes*0.7);
+  } else if(mode<5.0){                                      // nappe (plafond de laser dans la brume)
+    float y0=0.18+0.08*sin(uAnim*0.3);
+    float sheet=exp(-abs(p.y-y0)/0.006)+0.35*exp(-abs(p.y-y0)/0.05);
+    float sky=step(y0,p.y)*fbm(p*4.0+vec2(uAnim*0.2,0.0))*1.1*exp(-(p.y-y0)*3.0);
+    col=pal(0.0)*(sheet+sky);
+  } else {                                                  // pluie : faisceaux qui tombent en cascade
+    for(int i=0;i<24;i++){ if(float(i)>=n) break; float fi=float(i);
+      float x=(fi+0.5)/n-0.5; vec2 s=vec2(x*asp*0.95,0.56);
+      float on=step(fract(uAnim*0.8+fi*0.137),0.45+0.4*uBuild);
+      col+=pal(fi*0.07)*beamI(p,s,-1.5708+0.12*sin(uAnim*0.6+fi),w)*on; }
+  }
+  col*=fog*bright;
+  o=vec4(col,bgAlpha(col));
+}`),
+neon3d: FS(`
+float polyR(float a,float n){ float s=6.28318/n; return cos(3.14159/n)/cos(mod(a,s)-s*0.5); }
+float sdSeg(vec2 p,vec2 a,vec2 b){ vec2 pa=p-a, ba=b-a; float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0); return length(pa-ba*h); }
+float stars(vec2 p){ vec2 g=floor(p*18.0), f=fract(p*18.0)-0.5; float h=hash(g);
+  return step(0.965,h)*exp(-dot(f,f)*90.0)*(0.5+0.5*sin(uTime*3.0+h*40.0)); }
+vec3 neonLine(float d,vec3 c,float w){ return c*(exp(-d/w)*1.2+exp(-d/(w*8.0))*0.35)+vec3(1.0)*exp(-d/(w*0.35))*0.6; }
+mat3 rotY(float a){ return mat3(cos(a),0.0,-sin(a), 0.0,1.0,0.0, sin(a),0.0,cos(a)); }
+mat3 rotX(float a){ return mat3(1.0,0.0,0.0, 0.0,cos(a),sin(a), 0.0,-sin(a),cos(a)); }
+vec2 proj(vec3 v){ return v.xy*(1.6/(3.2-v.z)); }
+vec3 cubeV(int i){ return vec3((i&1)==1?1.0:-1.0,(i&2)==2?1.0:-1.0,(i&4)==4?1.0:-1.0); }
+vec3 octV(int i){ int ax=i/2; float sg=(i-ax*2)==0?1.0:-1.0; return ax==0?vec3(sg,0.0,0.0):ax==1?vec3(0.0,sg,0.0):vec3(0.0,0.0,sg); }
+float wire(vec2 q,mat3 m,float sc,bool cube){
+  float d=1e9;
+  if(cube){
+    for(int i=0;i<8;i++) for(int b=0;b<3;b++){ int bit=1<<b; if((i&bit)==0){
+      d=min(d,sdSeg(q,proj(m*cubeV(i)*sc),proj(m*cubeV(i|bit)*sc))); } }
+  } else {
+    for(int i=0;i<6;i++) for(int j=0;j<6;j++){ if(j>i && i/2!=j/2){
+      d=min(d,sdSeg(q,proj(m*octV(i)*sc*1.3),proj(m*octV(j)*sc*1.3))); } }
+  }
+  return d;
+}
+void main(){
+  float asp=uRes.x/uRes.y;
+  vec2 p=(vUv-0.5)*vec2(asp,1.0);
+  vec2 q=p/min(asp,1.0);                                    // coordonnées ramenées au petit côté de l'écran
+  float mode=mod(uMode,4.0), variant=mod(floor(uMode*0.25),3.0);
+  float w=0.006*(1.0+uKick*0.5);
+  vec3 col=vec3(0.0);
+  if(mode<1.0){                                             // tunnel de polygones néon
+    float n=8.0-2.0*variant;
+    float r=length(q)+1e-4, a=atan(q.y,q.x)+uAnim*0.12;
+    float rp=r/polyR(a,n);
+    float z=0.3/rp+uAnim*0.9;
+    float ds=abs(fract(z)-0.5)*rp*rp/0.3;
+    float k=floor(z+0.5);
+    vec3 c=hsv(uHue+mod(k,3.0)*0.12*uSat,uSat,1.0);
+    float depth=smoothstep(0.03,0.35,rp);
+    col=neonLine(ds,c,w)*depth*(0.7+0.6*uKick*step(0.5,fract(k*0.5)));
+    float s=6.28318/n, av=abs(mod(a,s)-s*0.5);
+    col+=neonLine((s*0.5-av)*r,hsv(uHue2,uSat*0.8,1.0),w*0.8)*depth*0.6;
+    col+=vec3(stars(q*0.6+uAnim*0.02))*0.6;
+  } else if(mode<2.0){                                      // anneaux ; au drop, fond coloré puis noir étoilé un temps sur deux
+    float r=length(q);
+    float off=(uEnergy>0.75 && mod(uInBar,2.0)>0.5) ? 1.0 : 0.0;
+    float R=0.22+uKick*0.05+uBurst*0.25;
+    vec3 bg=mix(hsv(uHue,uSat,1.0)*smoothstep(R*0.9,1.4,r)+hsv(uHue2,uSat,0.5)*smoothstep(1.4,0.3,r)*0.3, vec3(stars(q)), off);
+    float t=r/R;
+    vec3 rings=hsv(t*0.7+uHue+0.5,0.9*uSat+0.1,1.0)*(0.55+0.45*cos(t*25.0-uAnim*2.0))*smoothstep(0.08,0.2,t);
+    col=mix(bg,rings,step(t,1.0))+neonLine(abs(r-R),vec3(1.0),w);
+  } else if(mode<3.0){                                      // polyèdre filaire en rotation (cube / octaèdre)
+    mat3 m=rotX(uAnim*0.37+0.4)*rotY(uAnim*0.53);
+    float sc=0.55*(1.0+uKick*0.12+uBurst*0.6);
+    bool cube=variant!=1.0;
+    col=neonLine(wire(q,m,sc,cube),hsv(uHue,uSat,1.0),w);
+    col+=neonLine(wire(q,transpose(m),sc*0.45,!cube),hsv(uHue2,uSat,1.0),w*0.8)*0.8;
+    col+=vec3(stars(q*0.7-uAnim*0.01))*0.5;
+  } else {                                                  // étoile néon qui tourne, avec rayons
+    float n=5.0+variant*2.0;
+    float r=length(q), a=atan(q.y,q.x)-uAnim*0.2;
+    float R=0.35*(1.0+uKick*0.1+uBurst*0.5);
+    float rs=R*(0.55+0.45*pow(abs(cos(a*n*0.5)),3.0));
+    col=neonLine(abs(r-rs),hsv(uHue,uSat,1.0),w)+neonLine(abs(r-rs*0.55),hsv(uHue2,uSat,1.0),w)*0.8;
+    float spokes=pow(max(0.0,cos(a*n)),80.0)*smoothstep(R,R*2.5,r)*exp(-(r-R)*1.5);
+    col+=hsv(uHue+0.1,uSat,1.0)*spokes*(0.4+uKick);
+    col+=vec3(stars(q*0.8))*0.5;
+  }
+  o=vec4(col,bgAlpha(col));
+}`),
+sym: FS(`
+uniform sampler2D uScene; uniform sampler2D uMilkT; uniform float uUseMilk; uniform float uSym;
+void main(){
+  float asp=uRes.x/uRes.y;
+  vec2 p=(vUv-0.5)*vec2(asp,1.0);
+  if(uSym<1.5){ p.x=abs(p.x); }                            // miroir gauche / droite
+  else if(uSym<2.5){ p.y=abs(p.y); }                       // miroir haut / bas
+  else if(uSym<3.5){ p=abs(p); }                           // 4 quadrants
+  else {                                                   // kaléidoscope 6 ou 8 pans
+    float n=uSym<4.5?6.0:8.0, s=6.28318/n;
+    float r=length(p), a=atan(p.y,p.x)+uAnim*0.05;
+    a=mod(a,s); a=abs(a-s*0.5);
+    p=vec2(cos(a),sin(a))*r;
+  }
+  p*=1.0-uKick*0.04*uEnergy;
+  vec2 uv=p/vec2(asp,1.0)+0.5;
+  uv=1.0-abs(1.0-abs(uv));                                 // repli aux bords
+  vec4 s=texture(uScene,uv);
+  vec3 c=s.rgb;
+  if(uUseMilk>0.5) c+=texture(uMilkT,vec2(uv.x,1.0-uv.y)).rgb*(1.0-clamp(s.a,0.0,1.0));
+  o=vec4(c,1.0);
+}`),
+post: FS(`
+uniform float uGap; uniform float uFlash;
+void main(){
+  vec2 p=(vUv-0.5)*vec2(uRes.x/uRes.y,1.0);
+  float ang=1.5708+0.5*sin(uAnim*0.8);
+  vec2 d=vec2(cos(ang),sin(ang)); vec2 q=p-vec2(0.0,-0.6);
+  float perp=abs(q.x*d.y-q.y*d.x), along=dot(q,d);
+  float beam=step(0.0,along)*(exp(-perp/0.002)*0.9+exp(-perp/0.02)*0.25);
+  float a=clamp(uGap*0.93+uFlash,0.0,1.0);
+  vec3 col=vec3(beam*uGap)+vec3(uFlash);
+  o=vec4(min(col,vec3(1.0)),a);
+}`),
+co2: FS(`
+uniform float uT; uniform float uDur;
+vec2 vor(vec2 x){ vec2 n=floor(x), f=fract(x); float d1=8.0, d2=8.0;
+  for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(float(i),float(j));
+    vec2 o2=vec2(hash(n+g),hash(n+g+17.3)); vec2 r=g+o2-f; float d=dot(r,r);
+    if(d<d1){ d2=d1; d1=d; } else if(d<d2) d2=d; }
+  return vec2(sqrt(d1),sqrt(d2)); }
+void main(){
+  float k=uDur/45.0, t=uT/k;                               // chronologie ramenée à 45 s
+  float asp=uRes.x/uRes.y;
+  vec2 uv=vUv, p=(uv-0.5)*vec2(asp,1.0);
+  float plume=0.0;                                          // 1. jets depuis le bas (0-6 s)
+  if(t<7.0){
+    float jet=smoothstep(0.0,0.25,t)*(1.0-smoothstep(3.0,6.5,t));
+    for(int i=0;i<3;i++){
+      float x0=(float(i)-1.0)*asp*0.3;
+      float h=clamp(t/0.8,0.0,1.0)*1.25;
+      float nn=fbm(vec2(p.x*5.0+float(i)*3.1,uv.y*3.5-t*3.0));
+      float w=0.025+uv.y*0.32;
+      float c=smoothstep(w,w*0.25,abs(p.x-x0+(nn-0.5)*0.2*uv.y))*smoothstep(h,h-0.25,uv.y);
+      plume=max(plume,c*(0.55+0.7*nn));
+    }
+    plume*=jet;
+  }
+  float fogIn=smoothstep(2.0,8.0,t), fogOut=smoothstep(13.0,42.0,t);   // 2. brouillard puis dissipation
+  float n1=fbm(p*2.0+vec2(t*0.05,-t*0.1)), n2=fbm(p*4.5-vec2(t*0.07,t*0.18));
+  float dens=n1*0.65+n2*0.35;
+  float fog=fogIn*smoothstep(fogOut*1.15-0.15,fogOut*1.15+0.2,dens+0.1)*(0.8+0.25*n2);
+  float frost=0.0;                                          // 3. givre depuis les bords (9-24 s), fonte (30-45 s)
+  float grow=smoothstep(9.0,24.0,t)*0.3*(1.0-smoothstep(30.0,45.0,t));
+  if(grow>0.0){
+    float sm=min(uRes.x,uRes.y);                             // distance au bord, en fraction du petit côté
+    float edge=min(min(uv.x,1.0-uv.x)*uRes.x,min(uv.y,1.0-uv.y)*uRes.y)/sm;
+    float front=grow-(fbm(p*7.0)-0.5)*0.1;
+    float mask=smoothstep(front,front-0.06,edge);
+    vec2 v1=vor(p*14.0), v2=vor(p*38.0+3.7);
+    float crack=1.0-smoothstep(0.0,0.05,v1.y-v1.x);
+    float fine=1.0-smoothstep(0.0,0.08,v2.y-v2.x);
+    float sparkle=pow(noise(p*140.0),12.0)*2.0;
+    frost=mask*(0.22+0.45*crack+0.25*fine+sparkle)*(0.7+0.3*smoothstep(front,front-0.25,edge));
+  }
+  float a=clamp(max(plume,fog)+frost*(1.0-0.6*fog),0.0,0.97);
+  vec3 c=mix(vec3(0.93,0.96,1.0),vec3(0.8,0.9,1.0),clamp(frost,0.0,1.0));
+  c=mix(c,hsv(uHue,0.6,1.0),0.18*uKick*fog);               // les lumières du drop traversent la brume
+  o=vec4(c*a,a);
+}`),
 };
 const CLOUD_VS = `#version 300 es
 ${COMMON}
 in vec2 aUv; uniform float uAspect; out vec3 vCol;
+vec3 rnd3(vec2 s){ return fract(sin(vec3(dot(s,vec2(12.9898,78.233)),dot(s,vec2(39.3468,11.135)),dot(s,vec2(73.156,52.235))))*43758.5453)-0.5; }
 void main(){
   vec2 cu=camUV(aUv);
   vec3 c=textureLod(uCam,cu,0.0).rgb; float l=luma(c);
   float m=textureLod(uMask,cu,0.0).r*uUseMask;
   vec3 p=vec3((aUv.x-0.5)*2.0*uAspect,(aUv.y-0.5)*2.0,0.0);
-  p.z=(l-0.5)*(0.5+uBass*1.4)+m*(0.4+uBeat*0.8);
-  float ay=sin(uTime*0.27)*0.7, ax=sin(uTime*0.19)*0.35+0.15;
+  p.z=(l-0.5)*(0.4+uBass*1.0)+m*(0.35+uKick*0.5);
+  vec3 dir=normalize(rnd3(aUv*7.13)+vec3(0.0,0.0,0.001));
+  float b=uBurst*uBurst;                                    // éclate au drop puis se reforme
+  p+=dir*(b*2.4+uKick*0.05*uEnergy);
+  float ay=sin(uAnim*0.27)*0.7, ax=sin(uAnim*0.19)*0.35+0.15;
   mat3 ry=mat3(cos(ay),0.0,-sin(ay), 0.0,1.0,0.0, sin(ay),0.0,cos(ay));
   mat3 rx=mat3(1.0,0.0,0.0, 0.0,cos(ax),sin(ax), 0.0,-sin(ax),cos(ax));
   p=rx*ry*p;
-  float zc=3.0-p.z;
+  float zc=max(3.0-p.z,0.3);
   gl_Position=vec4(p.x*3.0/zc/uAspect,p.y*3.0/zc,0.0,1.0);
-  gl_PointSize=(2.5+uBass*6.0+uBeat*5.0)*uDpr*(3.0/zc);
-  vCol=mix(c,hsv(l*0.8+uTime*0.05,0.85,1.0),0.6)*(0.45+m*0.9+uTreb*0.5);
+  gl_PointSize=max(1.0,(2.2+uKick*4.0*uEnergy+b*4.0)*uDpr*(3.0/zc));
+  vCol=mix(c,pal(l),0.6)*(0.45+m*0.9+uTreb*0.4+uKick*0.3);
 }`;
 const CLOUD_FS = `#version 300 es
 precision highp float; in vec3 vCol; out vec4 o;
 void main(){ float a=smoothstep(0.5,0.15,length(gl_PointCoord-0.5)); o=vec4(vCol*a,a); }`;
-
-function mkShader(type, src){ const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
-function mkProg(vs, fs, attr){ const p=gl.createProgram(); gl.attachShader(p,mkShader(gl.VERTEX_SHADER,vs));
-  gl.attachShader(p,mkShader(gl.FRAGMENT_SHADER,fs)); gl.bindAttribLocation(p,0,attr); gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); p.u={}; return p; }
-const U = (p,n) => (n in p.u) ? p.u[n] : (p.u[n] = gl.getUniformLocation(p,n));
-
 const BLIT_FS = `#version 300 es
 precision highp float; uniform sampler2D uTex; uniform float uMilkBg; in vec2 vUv; out vec4 o;
 float luma(vec3 c){ return dot(c,vec3(0.299,0.587,0.114)); }
 void main(){ vec3 c=texture(uTex,vUv).rgb; float a=uMilkBg>0.5 ? clamp(pow(max(luma(c),0.0),0.55)*1.35,0.0,1.0) : 1.0; o=vec4(c,a); }`;
 
+function mkShader(type, src, name){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('Shader ' + name + ' : ' + gl.getShaderInfoLog(s)); return s; }
+function mkProg(vs, fs, attr, name){ const p = gl.createProgram(); gl.attachShader(p, mkShader(gl.VERTEX_SHADER, vs, name));
+  gl.attachShader(p, mkShader(gl.FRAGMENT_SHADER, fs, name)); gl.bindAttribLocation(p, 0, attr); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('Programme ' + name + ' : ' + gl.getProgramInfoLog(p)); p.u = {}; return p; }
+const U = (p, n) => (n in p.u) ? p.u[n] : (p.u[n] = gl.getUniformLocation(p, n));
+
 const progs = {};
-for (const k in SHADERS) progs[k] = mkProg(QUAD_VS, SHADERS[k], 'p');
-progs.cloud = mkProg(CLOUD_VS, CLOUD_FS, 'aUv');
-progs.blit = mkProg(QUAD_VS, BLIT_FS, 'p');
+for (const k in SHADERS){ try { progs[k] = mkProg(QUAD_VS, SHADERS[k], 'p', k); } catch (e) { err(e.message); } }
+try { progs.cloud = mkProg(CLOUD_VS, CLOUD_FS, 'aUv', 'cloud'); } catch (e) { err(e.message); }
+try { progs.blit = mkProg(QUAD_VS, BLIT_FS, 'p', 'blit'); } catch (e) { err(e.message); }
 
 const quadVao = gl.createVertexArray(); gl.bindVertexArray(quadVao);
 gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
-gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
 const cloudVao = gl.createVertexArray(); const cloudBuf = gl.createBuffer(); let cloudCount = 0;
 function buildCloud(){
-  const asp = fx.width/fx.height, N = 22000;
-  const cols = Math.round(Math.sqrt(N*asp)), rows = Math.round(N/cols), d = new Float32Array(cols*rows*2);
-  let i=0; for (let y=0;y<rows;y++) for (let x=0;x<cols;x++){ d[i++]=(x+0.5)/cols; d[i++]=(y+0.5)/rows; }
-  cloudCount = cols*rows;
+  const asp = fx.width / fx.height, N = Math.round(22000 * clamp(cfg.quality, 0.5, 1.4));
+  const cols = Math.round(Math.sqrt(N * asp)), rows = Math.round(N / cols), d = new Float32Array(cols * rows * 2);
+  let i = 0; for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++){ d[i++] = (x + 0.5) / cols; d[i++] = (y + 0.5) / rows; }
+  cloudCount = cols * rows;
   gl.bindVertexArray(cloudVao); gl.bindBuffer(gl.ARRAY_BUFFER, cloudBuf);
   gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
-}
-
-let fboTex = [null,null], fbo = [null,null], fboCur = 0;
-function buildFeedbackFBO(){
-  for (let i=0;i<2;i++){
-    if (fboTex[i]) gl.deleteTexture(fboTex[i]);
-    if (fbo[i]) gl.deleteFramebuffer(fbo[i]);
-    fboTex[i] = mkTex(3+i, gl.RGBA, gl.RGBA, fx.width, fx.height, null);
-    fbo[i] = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[i]);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex[i], 0);
-    gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
-  }
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 }
 function mkTex(unit, ifmt, fmt, w, h, data){
-  const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D, t);
+  const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, fmt, gl.UNSIGNED_BYTE, data); return t;
 }
+let fboTex = [null, null], fbo = [null, null], fboCur = 0, sceneTex = null, sceneFbo = null, milkTex = null;
+function buildSceneFBO(){
+  if (sceneTex) gl.deleteTexture(sceneTex); if (sceneFbo) gl.deleteFramebuffer(sceneFbo);
+  sceneTex = mkTex(5, gl.RGBA, gl.RGBA, fx.width, fx.height, null);
+  sceneFbo = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sceneTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  if (!milkTex) milkTex = mkTex(6, gl.RGBA, gl.RGBA, 1, 1, new Uint8Array(4));
+}
+function uploadMilk(){ gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, milkTex); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, milkCanvas); }
+function buildFeedbackFBO(){
+  for (let i = 0; i < 2; i++){
+    if (fboTex[i]) gl.deleteTexture(fboTex[i]);
+    if (fbo[i]) gl.deleteFramebuffer(fbo[i]);
+    fboTex[i] = mkTex(3 + i, gl.RGBA, gl.RGBA, fx.width, fx.height, null);
+    fbo[i] = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[i]);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex[i], 0);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
 gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
 mkTex(0, gl.RGBA, gl.RGBA, 1, 1, new Uint8Array(4));        // caméra
 mkTex(1, gl.R8, gl.RED, 1, 1, new Uint8Array(1));           // masque personnes
-mkTex(2, gl.R8, gl.RED, 256, 1, new Uint8Array(256));       // spectre
+mkTex(2, gl.R8, gl.RED, 128, 2, new Uint8Array(256));       // spectre : ligne 0 = niveaux, ligne 1 = crêtes
 
 function uploadCam(){
   if (video.readyState < 2) return;
   gl.activeTexture(gl.TEXTURE0);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 }
-function uploadFft(){
-  if (!freq) return;
+// spectre en 128 bandes logarithmiques (30 Hz → 16 kHz), montée rapide, descente lente, crêtes qui retombent
+const SPEC = { v:new Float32Array(128), pk:new Float32Array(128), u8:new Uint8Array(256) };
+function uploadSpectrum(dt){
+  if (!dbBuf || !actx) return;
+  const hz = actx.sampleRate / analyser.fftSize, n = dbBuf.length;
+  for (let i = 0; i < 128; i++){
+    const f0 = 30 * Math.pow(16000 / 30, i / 128), f1 = 30 * Math.pow(16000 / 30, (i + 1) / 128);
+    const a = Math.max(1, Math.floor(f0 / hz)), b = Math.min(n - 1, Math.max(a, Math.floor(f1 / hz)));
+    let m = -120; for (let k = a; k <= b; k++) m = Math.max(m, dbBuf[k]);
+    const target = clamp((m + 85 + i * 0.12) / 60, 0, 1);
+    SPEC.v[i] = target > SPEC.v[i] ? SPEC.v[i] + (target - SPEC.v[i]) * 0.6 : Math.max(target, SPEC.v[i] - dt * 1.6);
+    SPEC.pk[i] = Math.max(SPEC.v[i], SPEC.pk[i] - dt * 0.35);
+    SPEC.u8[i] = SPEC.v[i] * 255; SPEC.u8[128 + i] = SPEC.pk[i] * 255;
+  }
   gl.activeTexture(gl.TEXTURE2);
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 256, 1, gl.RED, gl.UNSIGNED_BYTE, freq.subarray(0,256));
-}
-function setCommon(p, t){
-  const W=fx.width, H=fx.height, vw=video.videoWidth||1, vh=video.videoHeight||1, sa=W/H, va=vw/vh;
-  gl.uniform1i(U(p,'uCam'),0); gl.uniform1i(U(p,'uMask'),1); gl.uniform1i(U(p,'uFft'),2);
-  gl.uniform2f(U(p,'uRes'),W,H);
-  gl.uniform2f(U(p,'uCamFit'), sa>va ? 1 : sa/va, sa>va ? va/sa : 1);
-  gl.uniform1f(U(p,'uMirror'), cfg.facing==='user' ? 1 : 0);
-  gl.uniform1f(U(p,'uTime'),t); gl.uniform1f(U(p,'uBass'),A.bass); gl.uniform1f(U(p,'uMid'),A.mid);
-  gl.uniform1f(U(p,'uTreb'),A.treb); gl.uniform1f(U(p,'uBeat'),A.beat); gl.uniform1f(U(p,'uVol'),A.vol);
-  gl.uniform1f(U(p,'uUseMask'), segReady ? 1 : 0); gl.uniform1f(U(p,'uDpr'), cfg.quality);
-  gl.uniform1f(U(p,'uMilkBg'), cfg.milkBg ? 1 : 0);
-}
-function drawFx(e, t){
-  gl.viewport(0,0,fx.width,fx.height);
-  if (e.id === 'milk'){ gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT); return; }
-  if (e.id === 'cloud'){
-    gl.clearColor(0,0,0, cfg.milkBg ? 0 : 1); gl.clear(gl.COLOR_BUFFER_BIT);
-    const p = progs.cloud; gl.useProgram(p); setCommon(p,t); gl.uniform1f(U(p,'uAspect'), fx.width/fx.height);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-    gl.bindVertexArray(cloudVao); gl.drawArrays(gl.POINTS, 0, cloudCount); gl.disable(gl.BLEND); return;
-  }
-  if (e.id === 'feedback'){
-    const cur = fboCur, prev = 1 - fboCur;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]); gl.viewport(0,0,fx.width,fx.height);
-    gl.disable(gl.BLEND);
-    const p = progs.feedback; gl.useProgram(p); setCommon(p,t); gl.uniform1i(U(p,'uPrev'), 3+prev);
-    gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0,0,fx.width,fx.height);
-    const bp = progs.blit; gl.useProgram(bp); gl.uniform1i(U(bp,'uTex'), 3+cur); gl.uniform1f(U(bp,'uMilkBg'), cfg.milkBg?1:0);
-    gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    fboCur = prev; return;
-  }
-  const p = progs[e.id];
-  gl.disable(gl.BLEND); gl.useProgram(p); setCommon(p,t);
-  gl.uniform1f(U(p,'uTransparent'), cfg.milkBg ? 1 : 0);
-  gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
-function drawStrobe(t){
-  if (!cfg.strobe || A.beat < 0.05) return;
-  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-  const p = progs.strobe; gl.useProgram(p); setCommon(p,t);
-  gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-  gl.disable(gl.BLEND);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 2, gl.RED, gl.UNSIGNED_BYTE, SPEC.u8);
 }
 
-/* ---------- Lecture / playlist ---------- */
-let curId = null, since = 0;
-function updateMilkVisibility(){ const e = EFX[curId]; milkCanvas.style.visibility = (e?.milk || cfg.milkBg) ? 'visible' : 'hidden'; }
-function setEffect(id){
+/* ---------- Dynamiques : la musique agit sur l'animation en cours ---------- */
+// kick → impulsion ; temps/mesure → pas de couleur ; phrase → mode ; section → vitesse, énergie, saturation ; drop → éclatement
+const DYN = { sym:0, inBar:0, symLockBar:0, kick:0, burst:0, flash:0, hue:0.62, hueT:0.62, hue2:0.12, sat:0.8, speed:1, energy:0.5, mode:0, lmode:1, lcount:10,
+  build:0, gap:0, anim:0, co2Start:-1, lastCO2:-1e9, lastFlash:0, hold:false, force:null, forceUntil:0, forceStart:0 };
+function effState(){
+  const t = nowS();
+  if (DYN.force && t < DYN.forceUntil) return DYN.force;
+  return ear.state;
+}
+function barDur(){ return 4 * ear.T; }
+function triggerFlash(v){                   // limité à 3 flashs par seconde (seuil de sécurité photosensibilité)
+  const t = nowS(); if (t - DYN.lastFlash < 0.34) return;
+  DYN.lastFlash = t; DYN.flash = Math.max(DYN.flash, v);
+}
+function hueStep(d){ DYN.hueT = (DYN.hueT + d) % 1; DYN.hue2 = (DYN.hueT + 0.33 + Math.random() * 0.2) % 1; }
+function updateDyn(dt){
+  const st = effState();
+  const bp = st === 'BUILD' ? (DYN.force === 'BUILD' ? clamp((nowS() - DYN.forceStart) / (8 * barDur()), 0, 1) : ear.buildP) : 0;
+  const T = { BREAK:[0.2,0.35,0.45], INTRO:[0.55,1,0.8], GROOVE:[0.6,1,0.8], GAP:[0.1,0.3,0.3], DROP:[1,1.5,1] }[st]
+    || [0.6 + 0.4 * bp, 1 + 1.8 * bp, 0.8 - 0.6 * bp];      // montée : accélère et blanchit
+  const k = 1 - Math.exp(-dt / 0.5);
+  DYN.energy += (T[0] - DYN.energy) * k; DYN.speed += (T[1] - DYN.speed) * k; DYN.sat += (T[2] - DYN.sat) * k;
+  DYN.build = bp;
+  DYN.kick *= Math.exp(-dt / 0.12);
+  DYN.flash *= Math.exp(-dt / 0.07);
+  DYN.burst = Math.max(0, DYN.burst - dt / (2 * barDur()));
+  const gT = st === 'GAP' ? 1 : 0; DYN.gap += (gT - DYN.gap) * (1 - Math.exp(-dt / (gT ? 0.08 : 0.05)));
+  let dh = DYN.hueT - DYN.hue; if (dh > 0.5) dh -= 1; if (dh < -0.5) dh += 1;
+  DYN.hue = (DYN.hue + dh * (1 - Math.exp(-dt / 0.06)) + 1) % 1;
+  DYN.anim += dt * DYN.speed;
+  // lasers : le mode suit la section, le nombre de faisceaux suit l'énergie
+  const mi = DYN.mode;
+  DYN.lmode = st === 'BREAK' ? [0, 4][mi % 2] : st === 'BUILD' ? 5 : st === 'GAP' ? 0 : st === 'DROP' ? [1, 3, 2][mi % 3] : [1, 2, 3][mi % 3];
+  DYN.lcount = st === 'BREAK' ? 4 : st === 'BUILD' ? 8 + 12 * bp : st === 'DROP' ? 18 : st === 'GAP' ? 1 : 10;
+}
+
+/* ---------- Directeur : choisit l'animation aux bons moments ---------- */
+let curId = null, since = 0, lastChangeBar = 0, lastModeBar = 0, barCount = 0, pendingStep = false, pendingBreakPick = false;
+const recentFx = [];
+const PACE = { calme:[64, 32], normal:[32, 16], nerveux:[16, 8] };
+function moodFor(st){ return st === 'BREAK' || st === 'GAP' ? 'l' : st === 'DROP' ? 'h' : st === 'BUILD' ? 'm' : 'm'; }
+function usable(p){ const e = EFX[p.id]; return p.on && !(e.cam && !camOK); }
+function pickEffect(mood, reason){
+  let c = cfg.effects.filter(p => usable(p) && p.mood.includes(mood) && p.id !== curId);
+  const fresh = c.filter(p => !recentFx.slice(-2).includes(p.id));
+  if (fresh.length) c = fresh;
+  if (!c.length) return false;
+  setEffect(c[Math.floor(Math.random() * c.length)].id, reason);
+  return true;
+}
+function setEffect(id, reason){
   const e = EFX[id]; if (!e) return;
-  curId = id; since = performance.now();
-  updateMilkVisibility();
-  if (e.milk && !cfg.milkPreset && viz) loadPreset(null, 1.5);
+  curId = id; since = performance.now(); lastChangeBar = barCount; lastModeBar = barCount;
+  recentFx.push(id); if (recentFx.length > 6) recentFx.shift();
+  chooseSym();
+  if (e.id === 'milk' && !cfg.milkPreset && viz && cfg.mode !== 'auto') loadPreset(null, 1.5);
   $('#curName').textContent = e.name;
+  logEvent('effet', { id, reason: reason || '' });
   if (!$('#admin').hidden) renderList();
 }
-function activeList(){ return cfg.mode === 'auto' ? cfg.playlist.filter(p => p.on) : cfg.playlist; }
+const SYM_FR = ['', 'miroir G/D', 'miroir H/B', '4 quadrants', 'kaléido 6', 'kaléido 8'];
+function chooseSym(){
+  if (cfg.symGen === 'off'){ DYN.sym = 0; return; }
+  if (barCount < (DYN.symLockBar || 0)) return;
+  const st = effState();
+  const opts = st === 'BREAK' ? [4, 5, 5, 0] : st === 'DROP' ? [1, 3, 5, 4, 0] : [0, 0, 1, 3, 4, 5];
+  let s = opts[Math.floor(Math.random() * opts.length)];
+  if (cfg.symGen === 'always' && !s) s = 5;
+  DYN.sym = s;
+}
+function nextMode(reason){
+  DYN.mode++; lastModeBar = barCount; hueStep(0.25 + Math.random() * 0.2); chooseSym();
+  if (cfg.mode === 'auto' && milkVisible() && !cfg.milkPreset) loadPreset(pickPresetName(ear.state === 'BREAK' ? 'calm' : ear.state === 'DROP' ? 'energy' : null), 2.5);
+  logEvent('mode', { n: DYN.mode, reason: reason || '' });
+}
+function onSection(e){
+  logEvent('section', { de:e.from, vers:e.to, big:!!e.big, montee:+(e.buildBars || 0).toFixed(1) });
+  pushDashEvent(e.to, e);
+  const auto = cfg.mode === 'auto' && !DYN.hold && !BENCH;
+  if (e.to === 'DROP'){
+    triggerFlash(1); DYN.burst = 1; DYN.kick = 1; hueStep(0.33); DYN.mode++;
+    if (auto) pickEffect('h', 'drop');
+    if (auto && milkVisible() && !cfg.milkPreset) loadPreset(pickPresetName('energy'), 0.2);
+    if (e.big && cfg.co2Auto && nowS() - DYN.lastCO2 > cfg.co2Cooldown * 60) startCO2('auto');
+  } else if (e.to === 'BREAK'){
+    pendingBreakPick = true;              // à la prochaine mesure
+    if (auto && milkVisible() && !cfg.milkPreset) loadPreset(pickPresetName('calm'), 5);
+  } else if (e.to === 'GAP'){
+    triggerFlash(0.8);                    // éclair blanc au sommet de la montée, puis noir
+  }
+}
+function onBeat(e){
+  const st = effState(); DYN.inBar = e.inBar;
+  if (st === 'DROP' && e.inBar % 2 === 0) hueStep(0.17);                          // drop : couleur tous les 2 temps
+  else if (st === 'BUILD' && (DYN.build > 0.6 || e.inBar === 0)) hueStep(0.09);  // montée : chaque mesure puis chaque temps
+  else if ((st === 'GROOVE' || st === 'INTRO') && e.inBar === 0) hueStep(0.12);   // groove : chaque mesure
+  if (e.inBar === 0) onBar(e);
+}
+function onBar(e){
+  barCount++;
+  const st = effState(), br = barCount;
+  if (st === 'BREAK' && (br - lastChangeBar) % 4 === 0) hueStep(0.04);
+  if (pendingStep){ pendingStep = false; step(1); return; }
+  if (BENCH || DYN.hold) return;
+  if (cfg.mode !== 'auto') return;
+  if (pendingBreakPick){ pendingBreakPick = false; pickEffect('l', 'break'); return; }
+  const [effB, modeB] = PACE[cfg.pace] || PACE.normal;
+  if (st === 'GROOVE' || st === 'DROP' || st === 'INTRO'){
+    if (br - lastChangeBar >= effB) pickEffect(moodFor(st), 'phrase');
+    else if (br - lastModeBar >= modeB) nextMode('phrase');
+  } else if (st === 'BREAK'){
+    if (br - lastChangeBar >= effB * 2) pickEffect('l', 'break long');
+    else if (br - lastModeBar >= modeB * 2) nextMode('break');
+  }
+}
+function drainEar(){
+  for (const e of ear.events.splice(0)){
+    if (e.type === 'kick'){
+      const st = effState();
+      if (st !== 'BREAK' && st !== 'GAP') DYN.kick = Math.max(DYN.kick, e.strong ? 1 : 0.55);
+      if (cfg.strobe && st === 'DROP' && e.strong) triggerFlash(0.9);
+    } else if (e.type === 'beat') onBeat(e);
+    else if (e.type === 'section') onSection(e);
+    else if (e.type === 'phrase'){ logEvent('phrase', { raison:e.reason }); pushDashEvent('PHRASE', e); if (cfg.mode === 'auto' && !DYN.hold && !BENCH) nextMode('retour après coupure'); }
+    else if (e.type === 'tempo'){ if (Math.abs((DYN._lastBpmLog || 0) - e.bpm) > 1){ DYN._lastBpmLog = e.bpm; logEvent('tempo', { bpm:+e.bpm.toFixed(1) }); } }
+  }
+}
+function startCO2(reason){ DYN.co2Start = nowS(); DYN.lastCO2 = DYN.co2Start; logEvent('co2', { reason }); }
+function forceSection(st){
+  const t = nowS();
+  if (st === 'DROP'){ const from = effState(); DYN.force = 'DROP'; DYN.forceStart = t; DYN.forceUntil = t + 16 * barDur(); ear.anchor?.(t); onSection({ from, to:'DROP', big:false }); return; }
+  DYN.force = st; DYN.forceStart = t; DYN.forceUntil = t + 8 * barDur();
+  logEvent('force', { section: st });
+  if (st === 'BREAK' && cfg.mode === 'auto' && !DYN.hold){ pickEffect('l', 'bouton break'); if (milkVisible() && !cfg.milkPreset) loadPreset(pickPresetName('calm'), 4); }
+}
+
+/* ---------- Playlist (durées) et Manuel ---------- */
+function activeList(){ return cfg.mode === 'manual' ? cfg.effects : cfg.effects.filter(usable); }
 function step(dir){
   const l = activeList(); if (!l.length) return;
   const i = l.findIndex(p => p.id === curId);
-  setEffect(l[(i + dir + l.length) % l.length].id);
+  setEffect(l[(i + dir + l.length) % l.length].id, 'suivant');
 }
-function tickPlaylist(now){
-  if (cfg.mode !== 'auto') return;
-  const l = cfg.playlist.filter(p => p.on); if (!l.length) return;
-  const cur = l.find(p => p.id === curId);
-  if (!cur) { setEffect(l[0].id); return; }
-  if (now - since > cur.dur*1000) step(1);
+function tickTimers(now){
+  if (BENCH) return;
+  if (cfg.mode === 'playlist'){
+    const l = cfg.effects.filter(usable); if (!l.length) return;
+    const cur = l.find(p => p.id === curId);
+    if (!cur) setEffect(l[0].id, 'playlist');
+    else if (now - since > cur.dur * 1000 && !pendingStep){ if (ear.bpm) pendingStep = true; else step(1); }
+  }
+  if (cfg.mode !== 'auto' && milkVisible() && !cfg.milkPreset && now - lastPreset > cfg.milkInterval * 1000) loadPreset(null, 2);
+}
+
+/* ---------- Rendu ---------- */
+function setCommon(p, t){
+  const W = fx.width, H = fx.height, vw = video.videoWidth || 1, vh = video.videoHeight || 1, sa = W / H, va = vw / vh;
+  gl.uniform1i(U(p,'uCam'), 0); gl.uniform1i(U(p,'uMask'), 1); gl.uniform1i(U(p,'uFft'), 2);
+  gl.uniform2f(U(p,'uRes'), W, H);
+  gl.uniform2f(U(p,'uCamFit'), sa > va ? 1 : sa / va, sa > va ? va / sa : 1);
+  gl.uniform1f(U(p,'uMirror'), cfg.facing === 'user' ? 1 : 0);
+  gl.uniform1f(U(p,'uTime'), t); gl.uniform1f(U(p,'uAnim'), DYN.anim);
+  gl.uniform1f(U(p,'uBass'), A.bass); gl.uniform1f(U(p,'uMid'), A.mid); gl.uniform1f(U(p,'uTreb'), A.treb);
+  gl.uniform1f(U(p,'uKick'), DYN.kick); gl.uniform1f(U(p,'uBurst'), DYN.burst); gl.uniform1f(U(p,'uEnergy'), DYN.energy);
+  gl.uniform1f(U(p,'uBuild'), DYN.build); gl.uniform1f(U(p,'uHue'), DYN.hue); gl.uniform1f(U(p,'uHue2'), DYN.hue2);
+  gl.uniform1f(U(p,'uSat'), DYN.sat); gl.uniform1f(U(p,'uMode'), DYN.mode);
+  gl.uniform1f(U(p,'uUseMask'), segReady ? 1 : 0); gl.uniform1f(U(p,'uDpr'), cfg.quality);
+  gl.uniform1f(U(p,'uMilkBg'), cfg.milkBg ? 1 : 0); gl.uniform1f(U(p,'uInBar'), DYN.inBar || 0);
+}
+function quad(){ gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }
+function drawFx(e, t, target){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, target);
+  gl.viewport(0, 0, fx.width, fx.height); gl.disable(gl.BLEND);
+  if (e.id === 'milk'){ gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); return; }
+  if (e.id === 'cloud' && progs.cloud){
+    gl.clearColor(0, 0, 0, cfg.milkBg ? 0 : 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    const p = progs.cloud; gl.useProgram(p); setCommon(p, t); gl.uniform1f(U(p,'uAspect'), fx.width / fx.height);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+    gl.bindVertexArray(cloudVao); gl.drawArrays(gl.POINTS, 0, cloudCount); gl.disable(gl.BLEND); return;
+  }
+  if (e.id === 'feedback' && progs.feedback && progs.blit){
+    const cur = fboCur, prev = 1 - fboCur;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo[cur]);
+    const p = progs.feedback; gl.useProgram(p); setCommon(p, t); gl.uniform1i(U(p,'uPrev'), 3 + prev); quad();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target);
+    const bp = progs.blit; gl.useProgram(bp); gl.uniform1i(U(bp,'uTex'), 3 + cur); gl.uniform1f(U(bp,'uMilkBg'), cfg.milkBg ? 1 : 0); quad();
+    fboCur = prev; return;
+  }
+  const p = progs[e.id]; if (!p) return;
+  gl.useProgram(p); setCommon(p, t);
+  if (e.id === 'lasers'){ gl.uniform1f(U(p,'uLMode'), DYN.lmode); gl.uniform1f(U(p,'uLCount'), DYN.lcount); }
+  quad();
+}
+function symActive(e){ return DYN.sym > 0 && !BENCH && !!progs.sym && e.id !== 'mirror' && e.id !== 'kaleido'; }
+function drawSym(t){
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, fx.width, fx.height); gl.disable(gl.BLEND);
+  const p = progs.sym; gl.useProgram(p); setCommon(p, t);
+  gl.uniform1i(U(p,'uScene'), 5); gl.uniform1i(U(p,'uMilkT'), 6);
+  gl.uniform1f(U(p,'uUseMilk'), milkVisible() && viz ? 1 : 0); gl.uniform1f(U(p,'uSym'), DYN.sym); quad();
+}
+let milkShown = null;
+function syncMilkCanvas(show){ if (show !== milkShown){ milkShown = show; milkCanvas.style.visibility = show ? 'visible' : 'hidden'; } }
+function drawOverlays(t){
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  if (DYN.co2Start >= 0 && progs.co2){
+    const ct = nowS() - DYN.co2Start;
+    if (ct > cfg.co2Dur) DYN.co2Start = -1;
+    else { const p = progs.co2; gl.useProgram(p); setCommon(p, t); gl.uniform1f(U(p,'uT'), ct); gl.uniform1f(U(p,'uDur'), cfg.co2Dur); quad(); }
+  }
+  if ((DYN.gap > 0.01 || DYN.flash > 0.01) && progs.post){
+    const p = progs.post; gl.useProgram(p); setCommon(p, t);
+    gl.uniform1f(U(p,'uGap'), DYN.gap); gl.uniform1f(U(p,'uFlash'), DYN.flash); quad();
+  }
+  gl.disable(gl.BLEND);
+}
+
+/* ---------- Banc d'essai automatique ---------- */
+let BENCH = null;
+function startBench(){
+  const list = [];
+  for (const e of EFFECTS){ if (e.cam && !camOK) continue; if (e.id === 'milk') list.push({ id:e.id, bg:true }); else { list.push({ id:e.id, bg:true }); list.push({ id:e.id, bg:false }); } }
+  BENCH = { list, i:-1, t0:0, dts:[], res:[], saved:{ mode:cfg.mode, milkBg:cfg.milkBg } };
+  $('#benchBtn').disabled = true; benchNext(); logEvent('banc-debut');
+}
+function benchNext(){
+  const B = BENCH;
+  if (B.i >= 0 && B.dts.length){
+    const d = B.dts.slice().sort((a, b) => a - b), med = d[d.length >> 1], p95 = d[Math.floor(d.length * 0.95)];
+    B.res.push({ id:B.list[B.i].id, fond:B.list[B.i].bg, fps:+(1000 / med).toFixed(1), p95ms:+p95.toFixed(1) });
+  }
+  B.i++; B.dts = [];
+  if (B.i >= B.list.length){
+    cfg.mode = B.saved.mode; cfg.milkBg = B.saved.milkBg; REC.bench = { quality:cfg.quality, res:B.res };
+    logEvent('banc-fin'); BENCH = null; $('#benchBtn').disabled = false; renderBench(); syncAdmin();
+    return;
+  }
+  const it = B.list[B.i]; cfg.milkBg = it.bg; setEffect(it.id, 'banc'); B.t0 = performance.now();
+  $('#benchOut').textContent = `Banc d'essai : ${B.i + 1}/${B.list.length} — ${EFX[it.id].name}${it.bg ? ' + fond' : ''}`;
+}
+function benchFrame(now, dt){
+  if (!BENCH) return;
+  if (now - BENCH.t0 > 2000) BENCH.dts.push(dt);
+  if (now - BENCH.t0 > 8000) benchNext();
+}
+function renderBench(){
+  const r = REC.bench; if (!r) return;
+  const rows = r.res.map(x => `<tr><td>${EFX[x.id].name}${x.fond ? ' + fond' : ''}</td><td class="num">${x.fps}</td><td class="num">${x.p95ms}</td></tr>`).join('');
+  $('#benchOut').innerHTML = `<table class="bench"><tr><th>Effet</th><th>fps</th><th>p95 ms</th></tr>${rows}</table><p class="hint">Qualité ${r.quality}. Résultats inclus dans le rapport partagé.</p>`;
 }
 
 /* ---------- Boucle principale ---------- */
-let frames = 0, fpsT = 0, fps = 0;
+let lastFrame = 0, lastHud = 0, lastSample = 0;
 function frame(now){
   requestAnimationFrame(frame);
-  const t = now/1000, e = EFX[curId]; if (!e) return;
-  updateAudio(now); tickPlaylist(now);
-  if ((e.milk || cfg.milkBg) && viz){
-    if (!cfg.milkPreset && now - lastPreset > cfg.milkInterval*1000) loadPreset(null, 2);
-    viz.render();
+  const t0 = performance.now();
+  const dt = lastFrame ? Math.min(0.1, (now - lastFrame) / 1000) : 0.016;
+  const dtMs = lastFrame ? now - lastFrame : 16; lastFrame = now;
+  const t = now / 1000, e = EFX[curId]; if (!e) return;
+  drainEar(); updateDyn(dt); tickTimers(now);
+  const sym = symActive(e);
+  syncMilkCanvas(milkVisible() && !sym);
+  let s = performance.now();
+  if (milkVisible() && viz){ viz.render(); if (sym) uploadMilk(); }
+  pAdd('milk', performance.now() - s);
+  s = performance.now(); if (e.cam) uploadCam(); pAdd('cam', performance.now() - s);
+  s = performance.now(); if (e.seg){ ensureSeg(); runSeg(now); } pAdd('seg', performance.now() - s);
+  s = performance.now(); uploadSpectrum(dt);
+  if (sym){ drawFx(e, t, sceneFbo); drawSym(t); } else drawFx(e, t, null);
+  pAdd('fx', performance.now() - s);
+  s = performance.now(); drawOverlays(t); pAdd('ovl', performance.now() - s);
+  pAdd('total', performance.now() - t0);
+  PERF.frames++; if (dtMs > 33.4) PERF.long++; PERF.dtMax = Math.max(PERF.dtMax, dtMs);
+  benchFrame(now, dtMs);
+  if (now - lastHud > 250){ lastHud = now; updateHud(now); }
+  if (now - lastSample > 1000){ lastSample = now; sampleSecond(); }
+}
+function sampleSecond(){
+  const el = nowS() - PERF.t0, n = Math.max(1, PERF.frames);
+  PERF.fps = PERF.frames / Math.max(0.2, el);
+  const ms = {}; for (const [k] of MODS) ms[k] = +((PERF.acc[k] || 0) / n).toFixed(2);
+  ms.audio = +((PERF.acc.audio || 0) / Math.max(1, PERF.audioN || 0)).toFixed(3);   // par appel de l'oreille (100 par seconde)
+  const mx = {}; for (const [k] of MODS) mx[k] = +(PERF.max[k] || 0).toFixed(1);
+  PERF.last = { ms, mx, fps:PERF.fps, long:PERF.long, dtMax:PERF.dtMax, segHz: segCount / Math.max(0.2, el) };
+  REC.samples.push({ t:+(nowS() - REC.t0).toFixed(1), fx:curId, mode:cfg.mode, st:ear.state, bpm:+ear.bpm.toFixed(1), fps:+PERF.fps.toFixed(1),
+    dtMax:+PERF.dtMax.toFixed(1), long:PERF.long, ms, q:cfg.quality, bg:cfg.milkBg ? 1 : 0, ia:segReady ? 1 : 0, co2:DYN.co2Start >= 0 ? 1 : 0 });
+  if (REC.samples.length > 21600) REC.samples.shift();
+  PERF.acc = {}; PERF.max = {}; PERF.frames = 0; PERF.audioN = 0; PERF.long = 0; PERF.dtMax = 0; PERF.t0 = nowS(); segCount = 0;
+}
+const ST_FR = { INTRO:'Démarrage', GROOVE:'Groove', BREAK:'Break', BUILD:'Montée', GAP:'Trou', DROP:'Drop' };
+function setDots(el, inBar){ el.querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i === inBar)); }
+function updateHud(now){
+  const info = ear.info(now / 1000), st = effState();
+  if (cfg.hud){
+    setDots($('#hudDots'), info.inBar);
+    $('#hudTxt').textContent = `${EFX[curId].name} · ${PERF.fps.toFixed(0)} fps · ${ear.bpm ? ear.bpm.toFixed(1) + ' BPM' : 'BPM ?'} · ${ST_FR[st] || st}${symActive(EFX[curId]) ? ' · ' + SYM_FR[DYN.sym] : ''}${DYN.hold ? ' · figé' : ''}${EFX[curId].seg && !segReady && !segFailed ? ' · chargement IA…' : ''}`;
   }
-  if (e.cam) uploadCam();
-  if (e.seg){ ensureSeg(); runSeg(now); }
-  uploadFft();
-  drawFx(e, t); drawStrobe(t);
-  frames++; if (now - fpsT > 1000){ fps = frames; frames = 0; fpsT = now; }
-  if (cfg.hud){ $('#hudTxt').textContent = `${e.name} · ${fps} fps${e.seg && !segReady ? ' · chargement IA…' : ''}`;
-    $('#beat').style.transform = `scale(${0.4 + A.beat*1.6})`; }
+  if (cfg.debug){
+    const L = PERF.last; if (L.ms){
+      const lines = MODS.map(([k, n]) => `${n.padEnd(11)} ${String(L.ms[k]).padStart(6)} ms  max ${String(L.mx[k]).padStart(5)}`);
+      $('#dbg').textContent = `${L.fps.toFixed(1)} fps · images > 33 ms : ${L.long}/s · pire ${L.dtMax.toFixed(0)} ms\n` + lines.join('\n') +
+        `\nIA ${L.segHz.toFixed(1)} Hz · rendu ${fx.width}×${fx.height} · MilkDrop ${milkCanvas.width}×${milkCanvas.height}` +
+        `\nkick ${ear.kickSlow.toFixed(1)} dB / réf ${ear.ref.toFixed(1)} · présent ${ear.present ? 'oui' : 'non'} · pente ${ear.cSlope.toFixed(0)} Hz/s`;
+    }
+  }
+  $('#pMode').textContent = { auto:'Auto', playlist:'Playlist', manual:'Manuel' }[cfg.mode];
+  $('#pHold').classList.toggle('on', DYN.hold);
   if (!$('#admin').hidden){
     $('#mB').style.setProperty('--v', A.bass); $('#mM').style.setProperty('--v', A.mid); $('#mT').style.setProperty('--v', A.treb);
-    const pc = v => Math.round(v*100) + '%';
+    const pc = v => Math.round(v * 100) + ' %';
     $('#meterTxt').textContent = `Basses ${pc(A.bass)} · Médiums ${pc(A.mid)} · Aigus ${pc(A.treb)}`;
+    $('#dBpm').textContent = ear.bpm ? ear.bpm.toFixed(1) : '—';
+    const chip = $('#dState'); chip.textContent = ST_FR[st] || st; chip.className = 'chip st-' + st;
+    $('#dConf').textContent = ear.locked ? `tempo verrouillé (confiance ${ear.conf.toFixed(2)})` : 'tempo en recherche…';
+    setDots($('#dDots'), info.inBar);
+    const [effB] = PACE[cfg.pace] || PACE.normal;
+    $('#dBar').textContent = `mesure ${((barCount - lastChangeBar) % effB) + 1}/${effB}`;
+    $('#dInfo').textContent = `Kick ${ear.present ? 'présent' : 'absent'} · montée ${Math.round(DYN.build * 100)} % · énergie ${Math.round(DYN.energy * 100)} %` +
+      (DYN.co2Start >= 0 ? ' · CO2 en cours' : '') + (DYN.force ? ` · forcé : ${ST_FR[DYN.force]}` : '');
+    $('#recInfo').textContent = `Enregistrement en continu : ${REC.samples.length} s mesurées, ${REC.events.length} événements.`;
   }
+}
+const DASH_EV = [];
+function pushDashEvent(kind, e){
+  const tt = new Date().toLocaleTimeString('fr-FR');
+  DASH_EV.unshift(`${tt} — ${kind === 'PHRASE' ? 'Nouvelle phrase' : ST_FR[kind] || kind}${e.big ? ' (gros drop)' : ''}`);
+  DASH_EV.length = Math.min(DASH_EV.length, 6);
+  $('#dEvents').innerHTML = DASH_EV.map(x => `<li>${x}</li>`).join('');
 }
 
 /* ---------- Taille / plein écran / écran allumé ---------- */
 function resize(){
-  const w = Math.round(innerWidth*cfg.quality), h = Math.round(innerHeight*cfg.quality);
-  for (const c of [milkCanvas, fx]){ c.width = w; c.height = h; }
-  if (viz) viz.setRendererSize(w, h);
-  buildCloud(); buildFeedbackFBO();
+  const w = Math.round(innerWidth * cfg.quality), h = Math.round(innerHeight * cfg.quality);
+  fx.width = w; fx.height = h;
+  milkCanvas.width = Math.round(w * MILK_SCALE); milkCanvas.height = Math.round(h * MILK_SCALE);
+  if (viz) viz.setRendererSize(milkCanvas.width, milkCanvas.height);
+  buildCloud(); buildFeedbackFBO(); buildSceneFBO();
 }
 addEventListener('resize', resize);
-function goFullscreen(){ const d=document.documentElement, f=d.requestFullscreen||d.webkitRequestFullscreen; if (f) Promise.resolve(f.call(d,{navigationUI:'hide'})).catch(()=>{}); }
+function goFullscreen(){ const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen; if (f) Promise.resolve(f.call(d, { navigationUI:'hide' })).catch(() => {}); }
+const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
 let wakeLock = null;
 async function keepAwake(){ try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} }
 
 /* ---------- Démarrage ---------- */
-const fsOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
 function status(t){ $('#status').textContent = t; }
 let booting = false, lastStep = 'départ';
 $('#startBtn').onclick = async () => {
   if (booting || appStarted) return;
   booting = true; $('#startBtn').disabled = true;
-  const watchdog = setTimeout(() => {
-    if (!appStarted) status(`Ça bloque après « ${lastStep} ». Fais une capture d'écran pour le retour.`);
-  }, 8000);
+  const watchdog = setTimeout(() => { if (!appStarted) status(`Ça bloque après « ${lastStep} ». Fais une capture d'écran pour le retour.`); }, 8000);
   try {
     lastStep = 'contexte audio'; if (!actx) buildAudioGraph();
     lastStep = 'micro/caméra'; status('Autorise le micro et la caméra…');
@@ -637,9 +1503,12 @@ $('#startBtn').onclick = async () => {
     lastStep = 'MilkDrop'; try { initMilk(); } catch (e) { err('MilkDrop : ' + e.message); }
     lastStep = 'premier effet';
     appStarted = true; keepAwake();
-    $('#start').hidden = true; $('#hud').hidden = !cfg.hud;
-    const first = cfg.playlist.find(p => p.on) || cfg.playlist[0];
-    setEffect(first.id); showAdminBtn();
+    earTimer = setInterval(earTick, 10);
+    $('#start').hidden = true; $('#hud').hidden = !cfg.hud; $('#dbg').hidden = !cfg.debug;
+    const first = cfg.mode === 'auto' ? (cfg.effects.find(p => p.id === 'milk' && p.on) || cfg.effects.find(usable) || cfg.effects[0])
+                                      : (cfg.effects.find(usable) || cfg.effects[0]);
+    setEffect(first.id, 'démarrage'); showPads();
+    logEvent('demarrage', { version:APP_VERSION });
     requestAnimationFrame(frame);
     goFullscreen();               // peut être refusé ici : un simple toucher sur l'écran le relance
   } catch (e) {
@@ -647,70 +1516,132 @@ $('#startBtn').onclick = async () => {
   } finally { clearTimeout(watchdog); booting = false; $('#startBtn').disabled = false; }
 };
 
-/* ---------- Menu d'administration ---------- */
+/* ---------- Pads de scène ---------- */
 let hideT;
-function showAdminBtn(){ const b=$('#adminBtn'); b.classList.remove('hide'); clearTimeout(hideT); hideT=setTimeout(()=>b.classList.add('hide'),3000); }
-fx.addEventListener('pointerdown', () => { if (appStarted && !fsOn()) goFullscreen(); showAdminBtn(); });
-$('#adminBtn').onclick = () => { $('#admin').hidden = false; syncAdmin(); };
-$('#closeAdmin').onclick = () => { $('#admin').hidden = true; showAdminBtn(); };
+function showPads(){ const b = $('#pads'); b.classList.remove('hide'); document.body.classList.add('padsOn'); clearTimeout(hideT);
+  hideT = setTimeout(() => { b.classList.add('hide'); document.body.classList.remove('padsOn'); }, 4000); }
+fx.addEventListener('pointerdown', () => { if (appStarted && !fsOn()) goFullscreen(); showPads(); });
+function pad(id, fn){ $(id).addEventListener('click', ev => { ev.stopPropagation(); fn(); showPads(); }); }
+pad('#pMode', () => { cfg.mode = { auto:'playlist', playlist:'manual', manual:'auto' }[cfg.mode]; save(); syncMode(); logEvent('mode-pilotage', { mode:cfg.mode }); });
+pad('#pTap', () => ear.tap(nowS()));
+pad('#pBreak', () => forceSection('BREAK'));
+pad('#pBuild', () => forceSection('BUILD'));
+pad('#pDrop', () => forceSection('DROP'));
+pad('#pCO2', () => startCO2('bouton'));
+pad('#pHold', () => { DYN.hold = !DYN.hold; logEvent('figer', { on:DYN.hold }); });
+pad('#pSym', () => { DYN.sym = (DYN.sym + 1) % 6; DYN.symLockBar = barCount + 16; logEvent('symetrie', { mode:SYM_FR[DYN.sym] || 'aucune' }); });
+pad('#pNext', () => { if (cfg.mode === 'auto') { if (!pickEffect(moodFor(effState()), 'bouton')) step(1); } else step(1); });
+pad('#pMenu', () => { $('#admin').hidden = false; clearTimeout(hideT); $('#pads').classList.add('hide'); document.body.classList.remove('padsOn'); syncAdmin(); });
 
+/* ---------- Menu d'administration ---------- */
+$('#closeAdmin').onclick = () => { $('#admin').hidden = true; showPads(); };
+$$('.tabs button').forEach(b => b.onclick = () => {
+  $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  $$('.tab').forEach(t => t.hidden = t.dataset.tab !== b.dataset.tab);
+});
 function renderList(){
   const box = $('#plist'); box.innerHTML = '';
-  cfg.playlist.forEach((p, i) => {
+  cfg.effects.forEach((p, i) => {
     const e = EFX[p.id], row = document.createElement('div');
     row.className = 'row' + (p.id === curId ? ' cur' : '');
-    const tags = [e.cam && 'caméra', e.seg && 'IA', e.milk && 'MilkDrop'].filter(Boolean).join(', ');
-    row.innerHTML = `<label class="chk name"><input type="checkbox" ${p.on?'checked':''}><span>${e.name} <small>${tags}</small></span></label>
-      <span><input type="number" class="dur" min="3" max="600" value="${p.dur}" aria-label="Durée en secondes"> s</span>
-      <button class="up" aria-label="Monter">↑</button><button class="dn" aria-label="Descendre">↓</button><button class="go">Tester</button>`;
+    const tags = [e.cam && 'caméra', e.seg && 'IA'].filter(Boolean).join(', ');
+    const opts = Object.entries(MOODS).map(([k, v]) => `<option value="${k}"${p.mood === k ? ' selected' : ''}>${v}</option>`).join('');
+    row.innerHTML = `<label class="chk name"><input type="checkbox" ${p.on ? 'checked' : ''}><span>${e.name} <small>${tags}</small></span></label>
+      <select class="mood" aria-label="Humeur">${opts}</select>
+      <span class="cell"><input type="number" class="dur" min="3" max="600" value="${p.dur}" aria-label="Durée en secondes (Playlist)"> s</span>
+      <span class="cell"><button class="up" aria-label="Monter">↑</button><button class="dn" aria-label="Descendre">↓</button></span>
+      <button class="go">Tester</button>`;
     row.querySelector('input[type=checkbox]').onchange = ev => { p.on = ev.target.checked; save(); };
+    row.querySelector('.mood').onchange = ev => { p.mood = ev.target.value; save(); };
     row.querySelector('.dur').onchange = ev => { p.dur = Math.max(3, +ev.target.value || e.dur); ev.target.value = p.dur; save(); };
-    const swap = j => { if (j<0 || j>=cfg.playlist.length) return; [cfg.playlist[i], cfg.playlist[j]] = [cfg.playlist[j], cfg.playlist[i]]; save(); renderList(); };
-    row.querySelector('.up').onclick = () => swap(i-1);
-    row.querySelector('.dn').onclick = () => swap(i+1);
-    row.querySelector('.go').onclick = () => { cfg.mode = 'manual'; save(); syncMode(); setEffect(p.id); };
+    const swap = j => { if (j < 0 || j >= cfg.effects.length) return; [cfg.effects[i], cfg.effects[j]] = [cfg.effects[j], cfg.effects[i]]; save(); renderList(); };
+    row.querySelector('.up').onclick = () => swap(i - 1);
+    row.querySelector('.dn').onclick = () => swap(i + 1);
+    row.querySelector('.go').onclick = () => { cfg.mode = 'manual'; save(); syncMode(); setEffect(p.id, 'tester'); };
     box.appendChild(row);
   });
 }
-function syncMode(){ document.querySelectorAll('.segm button').forEach(b => b.classList.toggle('on', b.dataset.mode === cfg.mode)); }
-function syncAdmin(){
-  syncMode(); renderList();
-  $('#presetSel').value = cfg.milkPreset; $('#milkInt').value = cfg.milkInterval;
-  $('#milkBgChk').checked = cfg.milkBg;
-  $('#gain').value = cfg.gain; $('#gainV').textContent = cfg.gain + '×';
-  $('#facing').value = cfg.facing; $('#quality').value = String(cfg.quality); $('#hudChk').checked = cfg.hud;
-  $('#strobeChk').checked = cfg.strobe;
+const MODE_HINT = {
+  auto:"Auto : l'app écoute la musique. Elle change d'animation aux changements de section et de phrase, et fait vivre l'animation en cours à chaque kick.",
+  playlist:"Playlist : les effets cochés s'enchaînent selon leur durée, calés sur la mesure. Les animations restent réactives à la musique.",
+  manual:"Manuel : tu choisis l'effet (Suivant, Tester). Les animations restent réactives à la musique." };
+function syncMode(){ $$('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === cfg.mode)); $('#modeHint').textContent = MODE_HINT[cfg.mode]; }
+function presetStats(){
+  const v = Object.values(cfg.presetMood);
+  $('#presetStats').textContent = `${v.filter(x => x === 'calm').length} calmes · ${v.filter(x => x === 'energy').length} énergiques · ${v.filter(x => x === 'off').length} exclus. Auto pioche dans les calmes pendant les breaks et dans les énergiques au drop.`;
 }
-document.querySelectorAll('.segm button').forEach(b => b.onclick = () => { cfg.mode = b.dataset.mode; since = performance.now(); save(); syncMode(); });
+function syncAdmin(){
+  syncMode(); renderList(); presetStats(); renderBench();
+  $('#presetSel').value = cfg.milkPreset; $('#milkInt').value = cfg.milkInterval; $('#milkBgChk').checked = cfg.milkBg;
+  $('#gain').value = cfg.gain; $('#gainV').textContent = (+cfg.gain).toFixed(1) + '×';
+  $('#facing').value = cfg.facing; $('#quality').value = String(cfg.quality); $('#hudChk').checked = cfg.hud; $('#dbgChk').checked = cfg.debug;
+  $('#strobeChk').checked = cfg.strobe; $('#co2Auto').checked = cfg.co2Auto; $('#profile').value = cfg.profile; $('#pace').value = cfg.pace; $('#symGen').value = cfg.symGen;
+  $('#verInfo').textContent = 'Version ' + APP_VERSION;
+}
+$$('#modeSeg button').forEach(b => b.onclick = () => { cfg.mode = b.dataset.mode; since = performance.now(); save(); syncMode(); logEvent('mode-pilotage', { mode:cfg.mode }); });
 $('#prevBtn').onclick = () => step(-1);
 $('#nextBtn').onclick = () => step(1);
 $('#fsBtn').onclick = goFullscreen;
+$('#tapBtn').onclick = () => ear.tap(nowS());
+for (const [k, p] of Object.entries(PROFILES)){ const o = document.createElement('option'); o.value = k; o.textContent = p.label; $('#profile').appendChild(o); }
+$('#profile').onchange = ev => { cfg.profile = ev.target.value; ear.profile = cfg.profile; ear.bpm = 0; ear.locked = false; save(); };
+$('#pace').onchange = ev => { cfg.pace = ev.target.value; save(); };
+$('#co2Auto').onchange = ev => { cfg.co2Auto = ev.target.checked; save(); };
+$('#strobeChk').onchange = ev => { cfg.strobe = ev.target.checked; save(); };
+$('#symGen').onchange = ev => { cfg.symGen = ev.target.value; DYN.symLockBar = 0; chooseSym(); save(); };
 
 const sel = $('#presetSel');
 presetNames.forEach(n => { const o = document.createElement('option'); o.value = o.textContent = n; sel.appendChild(o); });
 sel.onchange = () => { cfg.milkPreset = sel.value; save(); loadPreset(cfg.milkPreset || null, 1); };
-$('#milkInt').onchange = ev => { cfg.milkInterval = Math.max(3, +ev.target.value || 20); save(); };
-$('#milkBgChk').onchange = ev => { cfg.milkBg = ev.target.checked; save(); updateMilkVisibility(); };
+$('#milkInt').onchange = ev => { cfg.milkInterval = Math.max(5, +ev.target.value || 25); save(); };
+$('#milkBgChk').onchange = ev => { cfg.milkBg = ev.target.checked; save(); };
 $('#nextPreset').onclick = () => { cfg.milkPreset = ''; sel.value = ''; save(); loadPreset(null, 1.5); };
-$('#gain').oninput = ev => { cfg.gain = +ev.target.value; $('#gainV').textContent = cfg.gain + '×'; if (gainNode) gainNode.gain.value = cfg.gain; save(); };
+function tagPreset(kind){ if (!curPreset) return; if (cfg.presetMood[curPreset] === kind) delete cfg.presetMood[curPreset]; else cfg.presetMood[curPreset] = kind; save(); presetStats(); loadPreset(curPreset, 0); if (kind === 'off') loadPreset(null, 1); }
+$('#pmCalm').onclick = () => tagPreset('calm');
+$('#pmEnergy').onclick = () => tagPreset('energy');
+$('#pmOff').onclick = () => tagPreset('off');
+
+$('#gain').oninput = ev => { cfg.gain = +ev.target.value; $('#gainV').textContent = cfg.gain.toFixed(1) + '×'; if (gainNode) gainNode.gain.value = cfg.gain; save(); };
 $('#calBtn').onclick = () => {
-  const btn = $('#calBtn'), dur = 2000, start = performance.now(), samples = [];
+  const btn = $('#calBtn'), t0 = performance.now(), samples = [];
   btn.disabled = true; btn.textContent = 'Calibration…';
-  (function step(){
+  (function tick(){
     samples.push(A.bass);
-    if (performance.now() - start < dur) { requestAnimationFrame(step); return; }
-    const avg = samples.reduce((a,b) => a+b, 0) / samples.length || 0.02;
-    cfg.gain = Math.min(8, Math.max(0.5, cfg.gain * (0.4 / Math.max(avg, 0.03))));
+    if (performance.now() - t0 < 2000) { requestAnimationFrame(tick); return; }
+    const avg = samples.reduce((a, b) => a + b, 0) / samples.length || 0;
+    cfg.gain = clamp(cfg.gain * Math.pow(10, (0.65 - avg) * 35 / 20), 0.5, 8);
     if (gainNode) gainNode.gain.value = cfg.gain;
     save(); $('#gain').value = cfg.gain; $('#gainV').textContent = cfg.gain.toFixed(1) + '×';
     btn.disabled = false; btn.textContent = 'Calibrer (2 s, laisse la musique jouer)';
+    logEvent('calibration', { gain:+cfg.gain.toFixed(2) });
   })();
 };
-$('#strobeChk').onchange = ev => { cfg.strobe = ev.target.checked; save(); };
 $('#facing').onchange = async ev => { cfg.facing = ev.target.value; save(); try { await openMedia(); } catch (e) { err('Caméra : ' + e.message); } };
-$('#quality').onchange = ev => { cfg.quality = +ev.target.value; save(); resize(); };
+$('#quality').onchange = ev => { cfg.quality = +ev.target.value; save(); resize(); logEvent('qualite', { q:cfg.quality }); };
 $('#hudChk').onchange = ev => { cfg.hud = ev.target.checked; $('#hud').hidden = !cfg.hud; save(); };
-$('#resetBtn').onclick = () => { cfg = structuredClone(DEFAULT); save(); if (gainNode) gainNode.gain.value = cfg.gain; resize(); syncAdmin(); updateMilkVisibility(); };
+$('#dbgChk').onchange = ev => { cfg.debug = ev.target.checked; $('#dbg').hidden = !cfg.debug; save(); };
+$('#benchBtn').onclick = () => { if (!BENCH && appStarted) startBench(); };
+$('#resetBtn').onclick = () => { cfg = structuredClone(DEFAULT); save(); if (gainNode) gainNode.gain.value = cfg.gain; ear.profile = cfg.profile; resize(); syncAdmin(); };
+
+function deviceInfo(){
+  let gpu = '';
+  try { const x = gl.getExtension('WEBGL_debug_renderer_info'); gpu = x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); } catch {}
+  return { ua:navigator.userAgent, gpu, ecran:`${screen.width}×${screen.height} @${devicePixelRatio}`, fenetre:`${innerWidth}×${innerHeight}`,
+    coeurs:navigator.hardwareConcurrency, memoireGo:navigator.deviceMemory, rendu:`${fx.width}×${fx.height}`, echantillonnage:actx?.sampleRate };
+}
+$('#shareBtn').onclick = async () => {
+  const rep = { app:'VJ Live', version:APP_VERSION, date:new Date().toISOString(), appareil:deviceInfo(), config:cfg, banc:REC.bench,
+    mesures:REC.samples, evenements:REC.events };
+  const json = JSON.stringify(rep), name = `vjlive-rapport-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+  const file = new File([json], name, { type:'application/json' });
+  try {
+    if (navigator.canShare?.({ files:[file] })) { await navigator.share({ files:[file], title:'Rapport VJ Live' }); return; }
+  } catch (e) { if (e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+};
+syncAdmin();
+window.__vj = { ear, DYN, cfg:() => cfg, REC, PERF, setEffect, forceSection, startCO2, progs };
 </script>
 </body>
 </html>
