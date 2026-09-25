@@ -223,7 +223,7 @@
 <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js"></script>
 
 <script type="module">
-const APP_VERSION = '0.6 — 26/09/2026';
+const APP_VERSION = '0.7 — 26/09/2026';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const nowS = () => performance.now() / 1000;
@@ -531,7 +531,7 @@ const MOODS = { lmh:'Toujours', l:'Calme', m:'Moyen', h:'Intense', lm:'Calme + m
 /* ---------- Configuration (sauvegardée dans le navigateur) ---------- */
 const KEY = 'vjlive.cfg.v2';
 const DEFAULT = { mode:'auto', gain:2, facing:'user', quality:0.8, hud:true, debug:false,
-  milkBg:true, milkInterval:25, milkPreset:'', presetMood:{}, strobe:false, co2Auto:true, co2Dur:45, co2Cooldown:10,
+  milkBg:true, milkInterval:25, milkPreset:'', presetMood:{}, strobe:false, co2Auto:true, co2Dur:20, co2Cooldown:10,
   profile:'club', pace:'normal', symGen:'auto',
   effects: EFFECTS.map(e => ({ id:e.id, on:true, dur:e.dur, mood:e.mood })) };
 function loadCfg(){
@@ -624,6 +624,7 @@ const presets = BP ? BP.getPresets() : {};
 const presetNames = Object.keys(presets).sort((a, b) => a.localeCompare(b));
 let viz = null, lastPreset = 0, curPreset = '';
 const MILK_SCALE = 0.75;           // MilkDrop rendu un peu plus petit que l'écran : flou naturel, beaucoup moins coûteux
+let DPR = 1;                       // ratio de pixels physiques pris en compte pour la résolution du canvas (plafonné, cf resize())
 function initMilk(){
   if (!BC) { err('Butterchurn non chargé (vérifie la connexion)'); return; }
   viz = BC.createVisualizer(actx, milkCanvas, { width:milkCanvas.width, height:milkCanvas.height, pixelRatio:1, textureRatio:1 });
@@ -991,19 +992,21 @@ vec2 vor(vec2 x){ vec2 n=floor(x), f=fract(x); float d1=8.0, d2=8.0;
     if(d<d1){ d2=d1; d1=d; } else if(d<d2) d2=d; }
   return vec2(sqrt(d1),sqrt(d2)); }
 void main(){
-  float k=uDur/45.0, t=uT/k;                               // chronologie ramenée à 45 s
+  float k=uDur/45.0, t=uT/k;                               // chronologie de référence (0-45) ramenée à la durée réelle uDur
   float asp=uRes.x/uRes.y;
   vec2 uv=vUv, p=(uv-0.5)*vec2(asp,1.0);
-  float plume=0.0;                                          // 1. jets depuis le bas (0-6 s)
+  float plume=0.0;                                          // 1. deux canons aux angles gauche/droite (0-6 s)
   if(t<7.0){
     float jet=smoothstep(0.0,0.25,t)*(1.0-smoothstep(3.0,6.5,t));
-    for(int i=0;i<3;i++){
-      float x0=(float(i)-1.0)*asp*0.3;
+    for(int i=0;i<2;i++){
+      float sgn=float(i)*2.0-1.0;                           // -1 = angle gauche, +1 = angle droite
+      float x0=sgn*asp*0.46;
       float h=clamp(t/0.8,0.0,1.0)*1.25;
       float nn=fbm(vec2(p.x*5.0+float(i)*3.1,uv.y*3.5-t*3.0));
-      float w=0.025+uv.y*0.32;
-      float c=smoothstep(w,w*0.25,abs(p.x-x0+(nn-0.5)*0.2*uv.y))*smoothstep(h,h-0.25,uv.y);
-      plume=max(plume,c*(0.55+0.7*nn));
+      float lean=sgn*uv.y*asp*0.24;                         // le jet penche vers le centre en montant
+      float w=0.03+uv.y*0.34;
+      float c=smoothstep(w,w*0.25,abs(p.x-(x0-lean)+(nn-0.5)*0.2*uv.y))*smoothstep(h,h-0.25,uv.y);
+      plume=max(plume,c*(0.6+0.7*nn));
     }
     plume*=jet;
   }
@@ -1309,7 +1312,7 @@ function setCommon(p, t){
   gl.uniform1f(U(p,'uKick'), DYN.kick); gl.uniform1f(U(p,'uBurst'), DYN.burst); gl.uniform1f(U(p,'uEnergy'), DYN.energy);
   gl.uniform1f(U(p,'uBuild'), DYN.build); gl.uniform1f(U(p,'uHue'), DYN.hue); gl.uniform1f(U(p,'uHue2'), DYN.hue2);
   gl.uniform1f(U(p,'uSat'), DYN.sat); gl.uniform1f(U(p,'uMode'), DYN.mode);
-  gl.uniform1f(U(p,'uUseMask'), segReady ? 1 : 0); gl.uniform1f(U(p,'uDpr'), cfg.quality);
+  gl.uniform1f(U(p,'uUseMask'), segReady ? 1 : 0); gl.uniform1f(U(p,'uDpr'), cfg.quality * DPR);
   gl.uniform1f(U(p,'uMilkBg'), cfg.milkBg ? 1 : 0); gl.uniform1f(U(p,'uInBar'), DYN.inBar || 0);
 }
 function quad(){ gl.bindVertexArray(quadVao); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); }
@@ -1474,7 +1477,11 @@ function pushDashEvent(kind, e){
 
 /* ---------- Taille / plein écran / écran allumé ---------- */
 function resize(){
-  const w = Math.round(innerWidth * cfg.quality), h = Math.round(innerHeight * cfg.quality);
+  // La résolution du canvas était calculée sur les pixels CSS seuls (sans devicePixelRatio),
+  // donc largement sous la résolution native des écrans Android récents (dpr ~2.5-3.5) → rendu flou/pixelisé.
+  // On réintroduit le dpr réel, plafonné pour rester raisonnable en charge GPU (ajustable via Qualité).
+  DPR = Math.min(devicePixelRatio || 1, 1.5);
+  const w = Math.round(innerWidth * DPR * cfg.quality), h = Math.round(innerHeight * DPR * cfg.quality);
   fx.width = w; fx.height = h;
   milkCanvas.width = Math.round(w * MILK_SCALE); milkCanvas.height = Math.round(h * MILK_SCALE);
   if (viz) viz.setRendererSize(milkCanvas.width, milkCanvas.height);
