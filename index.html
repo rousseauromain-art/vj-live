@@ -223,7 +223,7 @@
 <script src="https://cdn.jsdelivr.net/npm/butterchurn-presets@2.4.7/lib/butterchurnPresets.min.js"></script>
 
 <script type="module">
-const APP_VERSION = '0.8 — 26/09/2026';
+const APP_VERSION = '0.9 — 26/09/2026';
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const nowS = () => performance.now() / 1000;
@@ -248,6 +248,7 @@ const PROFILES = {
   club: { label:'Club 4/4 : house, techno, trance', bpmMin:118, bpmMax:152, kickLo:40, kickHi:125 },
   hard: { label:'Hard : hard trance, hard techno',   bpmMin:136, bpmMax:170, kickLo:40, kickHi:130 },
   dnb:  { label:"Drum'n'bass (expérimental)",        bpmMin:160, bpmMax:186, kickLo:30, kickHi:110 },
+  wide: { label:'Auto — tous styles (70-190 BPM, moins précis sur les gros drops)', bpmMin:70, bpmMax:190, kickLo:40, kickHi:125 },
 };
 const EAR_CFG = {
   kOnK: 1.6,        // seuil d'onset kick : moyenne + k × écart-type
@@ -256,6 +257,7 @@ const EAR_CFG = {
   presentDb: 8,     // présence : niveau lissé > référence − presentDb (pendant ~1 temps)
   absentDb: 12,     // absence : niveau lissé < référence − absentDb (pendant ~1 temps)
   tempoConf: 0.20,  // confiance minimale pour accepter une estimation de tempo
+  lockSec: 3.0,     // 1er verrouillage : le même candidat doit tenir au moins ça (secondes réelles, pas juste 2 mesures consécutives qui partagent presque la même fenêtre d'analyse) — évite un verrouillage sur un faux rapport harmonique (ex. 4:3) trouvé par hasard tôt dans le morceau, surtout avec une plage de recherche large
   buildC: 18,       // montée : pente du centroïde (Hz/s)
   buildH: 0.30,     // montée : pente des aigus (dB/s)
   buildRise: 250,   // montée : hausse minimale du centroïde sur 8 s (Hz)
@@ -269,7 +271,7 @@ function createEar(profileId){
     profile: profileId || 'club',
     kickDb:-120, kickSlow:-120, fullFast:-120, fullSlow:-120, hiDb:-120, hiSlow:-120, centroid:0, cSmooth:0,
     ref:-60, kickFloor:-120, present:false, lastStrong:0, lastKick:0,
-    bpm:0, conf:0, locked:false, T:0.46, cand:0, candN:0,
+    bpm:0, conf:0, locked:false, T:0.46, cand:0, candN:0, _candT0:0,
     beat:0, lastBeatT:0, nextBeatT:0, barAnchor:0,
     state:'INTRO', since:0, absentSince:0, buildSince:0, buildingSince:0, building:false, fromBreak:false,
     stateLog:[], breakStart:0, cutActive:false, cSlope:0, hSlope:0, buildP:0, cAtBuild:0,
@@ -319,12 +321,23 @@ function createEar(profileId){
       const L = 60 * fs / b, s = acI(L) + 0.6 * acI(2 * L) + 0.4 * acI(4 * L);
       scores.push(s); if (s > best){ best = s; bestB = b; }
     }
+    // biais demi-tempo : des croches (charleston...) créent souvent un pic d'autocorrélation presque aussi fort à
+    // la moitié de la vraie pulsation (tempo double) ; sur une plage de recherche large, ce faux candidat peut
+    // gagner. Si la moitié du meilleur candidat obtient un score presque aussi bon, on préfère le plus lent —
+    // heuristique standard pour lever cette ambiguïté d'octave (le concept musical de « temps » est plus souvent
+    // la pulsation lente que sa subdivision).
+    if (bestB / 2 >= p.bpmMin){
+      const Lh = 60 * fs / (bestB / 2), sh = acI(Lh) + 0.6 * acI(2 * Lh) + 0.4 * acI(4 * Lh);
+      if (sh >= best * 0.85){ bestB /= 2; best = sh; }
+    }
     scores.sort((a, b) => a - b);
     E.conf = best - scores[scores.length >> 1];
     if (E.conf < EAR_CFG.tempoConf || !E.present) return;
     if (!E.bpm){
-      if (Math.abs(bestB - E.cand) < 1.5){ if (++E.candN >= 2){ E.bpm = bestB; E.locked = true; } }
-      else { E.cand = bestB; E.candN = 1; }
+      if (Math.abs(bestB - E.cand) < 1.5){
+        if (!E._candT0) E._candT0 = now;
+        if (now - E._candT0 >= EAR_CFG.lockSec){ E.bpm = bestB; E.locked = true; }
+      } else { E.cand = bestB; E.candN = 1; E._candT0 = now; }
     } else if (Math.abs(bestB - E.bpm) < 2.5){
       E.bpm = E.bpm * 0.8 + bestB * 0.2; E.locked = true; E.candN = 0;
     } else {
